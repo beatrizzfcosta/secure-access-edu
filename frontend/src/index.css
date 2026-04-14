@@ -1,0 +1,127 @@
+/* 🔹 TAILWIND BASE */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 🔹 FONTES */
+body {
+  font-family: 'Inter', sans-serif;
+}
+
+h1, h2, h3 {
+  font-family: 'Manrope', sans-serif;
+}
+
+/* 🔹 OTP INPUT (MFA) */
+.otp-input {
+  text-align: center;
+  font-weight: bold;
+  font-size: 1.25rem;
+  border-bottom: 2px solid #c2c6d4;
+  background-color: #e6e8ea;
+  transition: all 0.2s ease;
+}
+
+.otp-input:focus {
+  outline: none;
+  border-bottom: 2px solid #00478d;
+  background-color: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 71, 141, 0.08);
+}
+
+/* 🔹 REMOVER SPIN BUTTON (inputs numéricos) */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type=number] {
+  -moz-appearance: textfield;
+}
+
+/* 🔹 BOTÕES */
+.btn-primary {
+  @apply bg-blue-600 text-white font-semibold rounded-lg shadow-md transition-all;
+}
+
+.btn-primary:hover {
+  @apply bg-blue-700 shadow-lg;
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+.btn-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 🔹 CARD */
+.card {
+  @apply bg-white rounded-xl shadow-md border border-gray-200;
+}
+
+/* 🔹 INPUT BASE */
+.input-base {
+  @apply w-full h-12 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500;
+}
+
+/* 🔹 ERRO */
+.error-box {
+  @apply flex items-center gap-2 p-3 bg-red-100 text-red-700 rounded-lg text-sm;
+}
+
+/* 🔹 SUCESSO */
+.success-box {
+  @apply flex items-center gap-2 p-3 bg-green-100 text-green-700 rounded-lg text-sm;
+}
+
+/* 🔹 LOADING SPINNER */
+.spinner {
+  border: 3px solid rgba(255,255,255,0.3);
+  border-top: 3px solid white;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 🔹 BACKGROUND DECORATION (opcional) */
+.bg-gradient-soft {
+  background: radial-gradient(circle at top left, rgba(0,71,141,0.1), transparent),
+              radial-gradient(circle at bottom right, rgba(81,95,116,0.1), transparent);
+}
+
+/* 🔹 TEXTO AUXILIAR */
+.text-muted {
+  color: #6b7280;
+}
+
+/* 🔹 BADGE SEGURANÇA */
+.badge-security {
+  background-color: #d7f1d8;
+  color: #006e1c;
+  border: 1px solid #b2e1b5;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* 🔹 TIMER */
+.timer {
+  font-weight: bold;
+  color: #00478d;
+}
+
+.timer-expired {
+  color: #ba1a1a;
+}
