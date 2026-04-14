@@ -1,127 +1,71 @@
-// src/pages/public/Login/Login.jsx
-import { useState } from "react";
-import { login } from "../../services/authService";
-import { useAuth } from "../../hooks/useAuth";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
-export default function Login() {
-  const [form, setForm] = useState({ email: "", password: "" });
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const { loginUser } = useAuth();
-  const navigate = useNavigate();
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    try {
-      const res = await login(form);
-
-      // 👉 Se MFA for necessário
-      if (res.data.mfaRequired) {
-        navigate("/mfa");
-        return;
-      }
-
-      loginUser(res.data.user);
-      navigate("/dashboard");
-
-    } catch (err) {
-      setError("Credenciais inválidas");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+export default function NotFound() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen flex flex-col items-center justify-between bg-gray-50">
 
-        {/* HEADER */}
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold">Academic Curator</h1>
-          <p className="text-sm text-gray-500">
-            Plataforma Segura de Gestão Académica
-          </p>
+      {/* HEADER */}
+      <header className="w-full max-w-7xl px-8 py-6 flex justify-start items-center">
+        <div className="flex items-center gap-2">
+          <span className="text-blue-700 text-2xl">🏛️</span>
+          <span className="font-bold text-xl text-blue-700">
+            Academic Curator
+          </span>
+        </div>
+      </header>
 
-          <div className="mt-3 text-green-700 text-xs bg-green-100 px-3 py-1 rounded-full inline-block">
-            Conta protegida com verificação em dois fatores
+      {/* MAIN */}
+      <main className="flex-grow flex flex-col items-center justify-center px-6 text-center max-w-2xl">
+
+        {/* ICON */}
+        <div className="mb-10">
+          <div className="bg-gray-100 p-10 rounded-2xl shadow-sm relative">
+            <span className="text-6xl opacity-40">🧭</span>
+
+            <div className="absolute -bottom-4 -right-4 bg-white p-3 rounded-lg shadow">
+              📚
+            </div>
           </div>
         </div>
 
-        {/* CARD */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
+        {/* TEXTO */}
+        <h1 className="text-5xl font-bold mb-2">
+          404
+        </h1>
 
-          <h2 className="text-xl font-semibold mb-2">
-            Entrar na conta
-          </h2>
+        <h2 className="text-2xl font-semibold mb-4">
+          Página não encontrada
+        </h2>
 
-          <p className="text-sm text-gray-500 mb-4">
-            Acesse sua biblioteca e recursos exclusivos.
-          </p>
+        <p className="text-gray-600 mb-8 max-w-md">
+          A página que procura não existe ou foi movida.
+        </p>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+        {/* BOTÃO */}
+        <Link
+          to="/"
+          className="bg-blue-600 text-white px-6 py-3 rounded-lg shadow hover:bg-blue-700 transition"
+        >
+          Voltar ao início
+        </Link>
 
-            {/* EMAIL */}
-            <input
-              type="email"
-              placeholder="nome@universidade.edu"
-              className="w-full border p-2 rounded"
-              autoComplete="email"
-              required
-              onChange={(e) =>
-                setForm({ ...form, email: e.target.value })
-              }
-            />
-
-            {/* PASSWORD */}
-            <input
-              type="password"
-              placeholder="••••••••"
-              className="w-full border p-2 rounded"
-              autoComplete="current-password"
-              required
-              onChange={(e) =>
-                setForm({ ...form, password: e.target.value })
-              }
-            />
-
-            {/* ERRO */}
-            {error && (
-              <div className="text-red-600 text-sm">
-                {error}
-              </div>
-            )}
-
-            {/* BOTÃO */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 text-white py-2 rounded"
-            >
-              {loading ? "Autenticando..." : "Continuar"}
-            </button>
-
-          </form>
-
-          <p className="text-sm text-center mt-4">
-            Não tem uma conta?{" "}
-            <span className="text-blue-600 cursor-pointer">
-              Solicitar acesso
-            </span>
-          </p>
-
+        {/* LINKS EXTRA */}
+        <div className="mt-8 flex gap-6 text-blue-600 text-sm">
+          <span className="cursor-pointer hover:underline">
+            Pesquisar
+          </span>
+          <span className="cursor-pointer hover:underline">
+            Suporte
+          </span>
         </div>
 
-        {/* FOOTER */}
-        <div className="text-center text-xs text-gray-400 mt-6">
-          Autenticação Segura (JWT)
-        </div>
+      </main>
 
-      </div>
+      {/* FOOTER */}
+      <footer className="w-full py-6 bg-gray-100 text-center text-sm text-gray-500">
+        © 2024 Academic Curator
+      </footer>
+
     </div>
   );
 }

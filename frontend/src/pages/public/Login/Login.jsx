@@ -110,7 +110,7 @@ export default function Login() {
           <p className="text-sm text-center mt-4">
             Não tem uma conta?{" "}
             <span className="text-blue-600 cursor-pointer">
-              Solicitar acesso
+              <a href="/register">Solicitar acesso</a>
             </span>
           </p>
 

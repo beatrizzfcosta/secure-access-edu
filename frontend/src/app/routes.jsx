@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import Login from "../pages/public/Login/Login";
 import MFA from "../pages/public/Login/Mfa";
+import MFASetup from "../pages/public/Login/MFASetup";
+import Register from "../pages/public/Login/Register";
 
 import Dashboard from "../pages/shared/Dashboard/Dashboard";
 import Profile from "../pages/shared/Profile/Profile";
@@ -28,6 +30,10 @@ export default function AppRoutes() {
         <Route path="/login" element={<Login />} />
 
         <Route path="/mfa" element={<MFA />} />
+
+        <Route path="/mfa/setup" element={<MFASetup />} />
+
+        <Route path="/register" element={<Register />} />
 
         {/* 🔓 TESTE */}
         <Route path="/dashboard" element={
