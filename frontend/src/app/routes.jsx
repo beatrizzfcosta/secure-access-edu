@@ -26,6 +26,9 @@ export default function AppRoutes() {
     <BrowserRouter>
       <Routes>
 
+
+        <Route path="/" element={<Login />} />
+
         {/* 🔓 PUBLIC */}
         <Route path="/login" element={<Login />} />
 
