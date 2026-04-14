@@ -4,13 +4,18 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Login from "../pages/public/Login/Login";
 import MFA from "../pages/public/Login/Mfa";
 import MFASetup from "../pages/public/Login/MFASetup";
-import Register from "../pages/public/Login/Register";
+import Register from "../pages/public/Register/Register";
 
 import Dashboard from "../pages/shared/Dashboard/Dashboard";
 import Profile from "../pages/shared/Profile/Profile";
 
+import DashboardStundent from "../pages/student/Dashboard";
 import StudentTasks from "../pages/student/Tasks/StudentTasks";
+
+import DashboardProfessor from "../pages/professor/Dashboard";
 import ManageTasks from "../pages/professor/Tasks/ManageTasks";
+
+import DashboardAdmin from "../pages/admin/Dashboard";
 import UserManagement from "../pages/admin/Users/UserManagement";
 
 import Unauthorized from "../pages/Unauthorized/Unauthorized";
@@ -38,8 +43,11 @@ export default function AppRoutes() {
 
         <Route path="/register" element={<Register />} />
 
+        <Route path="/dashboard" element={<Dashboard />} />
+
+
         {/* 🔓 TESTE */}
-        <Route path="/dashboard" element={
+        <Route path="/dashboard1" element={
           <AuthGuard>
             <Dashboard />
           </AuthGuard>
@@ -59,6 +67,14 @@ export default function AppRoutes() {
         } />
 
         {/* 🎓 STUDENT */}
+        <Route path="/student/" element={
+          <AuthGuard>
+            <RoleGuard allowedRoles={[ROLES.STUDENT]}>
+              <DashboardStundent />
+            </RoleGuard>
+          </AuthGuard>
+        } />
+
         <Route path="/student/tasks" element={
           <AuthGuard>
             <RoleGuard allowedRoles={[ROLES.STUDENT]}>
@@ -67,7 +83,15 @@ export default function AppRoutes() {
           </AuthGuard>
         } />
 
+
         {/* 👨‍🏫 PROFESSOR */}
+          <Route path="/professor/" element={
+          <AuthGuard>
+            <RoleGuard allowedRoles={[ROLES.PROFESSOR]}>
+              <DashboardProfessor />
+            </RoleGuard>
+          </AuthGuard>
+        } />
         <Route path="/professor/tasks" element={
           <AuthGuard>
             <RoleGuard allowedRoles={[ROLES.PROFESSOR]}>
@@ -77,6 +101,13 @@ export default function AppRoutes() {
         } />
 
         {/* 👨‍💼 ADMIN */}
+          <Route path="/admin/" element={
+          <AuthGuard>
+            <RoleGuard allowedRoles={[ROLES.ADMIN]}>
+              <DashboardAdmin />
+            </RoleGuard>
+          </AuthGuard>
+        } />
         <Route path="/admin/users" element={
           <AuthGuard>
             <RoleGuard allowedRoles={[ROLES.ADMIN]}>

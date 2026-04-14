@@ -1,0 +1,128 @@
+import DashboardLayout from "../../components/Layout/DashboardLayout";
+
+export default function StudentDashboard() {
+  return (
+    <DashboardLayout>
+      <div className="space-y-8">
+
+        {/* HEADER */}
+        <div>
+          <h3 className="text-3xl font-bold mb-2">
+            Welcome back, Student
+          </h3>
+          <p className="text-gray-500">
+            Your academic tasks and progress overview
+          </p>
+        </div>
+
+        {/* GRID */}
+        <div className="grid md:grid-cols-12 gap-6">
+
+          {/* MINHAS TAREFAS */}
+          <div className="md:col-span-7 bg-white p-6 rounded shadow">
+            <div className="flex justify-between mb-4">
+              <h4 className="font-bold">Minhas Tarefas</h4>
+              <button className="text-blue-600 text-sm">
+                Ver tudo
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <TaskItem
+                title="Tese de Mestrado"
+                desc="3 dias restantes"
+                priority="Urgente"
+              />
+
+              <TaskItem
+                title="Análise de Dados"
+                desc="5 dias restantes"
+                priority="Médio"
+              />
+
+              <TaskItem
+                title="Revisão Literatura"
+                desc="Próxima semana"
+                priority="Normal"
+              />
+            </div>
+          </div>
+
+          {/* PROGRESSO */}
+          <div className="md:col-span-5 space-y-4">
+
+            <div className="bg-white p-6 rounded shadow text-center">
+              <h4 className="font-bold mb-4">
+                Estado das Tarefas
+              </h4>
+
+              <div className="text-3xl font-bold text-blue-600">
+                75%
+              </div>
+
+              <p className="text-sm text-gray-500">
+                Concluído
+              </p>
+
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <Stat label="Concluídas" value="12" />
+                <Stat label="Pendentes" value="4" />
+              </div>
+            </div>
+
+            <div className="bg-blue-600 text-white p-4 rounded">
+              <p className="font-bold">Upgrade Curriculum</p>
+              <p className="text-sm opacity-80">
+                Get AI feedback on your work
+              </p>
+            </div>
+
+          </div>
+        </div>
+
+        {/* STATS */}
+        <div className="grid md:grid-cols-3 gap-4">
+          <StatCard title="Tempo de Estudo" value="14h" />
+          <StatCard title="Artigos" value="28" />
+          <StatCard title="Créditos" value="120" />
+        </div>
+
+      </div>
+    </DashboardLayout>
+  );
+}
+
+/* COMPONENTES */
+
+function TaskItem({ title, desc, priority }) {
+  return (
+    <div className="flex justify-between items-center bg-gray-100 p-3 rounded">
+      <div>
+        <p className="font-medium">{title}</p>
+        <p className="text-sm text-gray-500">{desc}</p>
+      </div>
+
+      <span className="text-xs bg-gray-200 px-2 py-1 rounded">
+        {priority}
+      </span>
+    </div>
+  );
+}
+
+function Stat({ label, value }) {
+  return (
+    <div>
+      <p className="text-sm text-gray-500">{label}</p>
+      <p className="font-bold">{value}</p>
+    </div>
+  );
+}
+
+function StatCard({ title, value }) {
+  return (
+    <div className="bg-white p-4 rounded shadow">
+      <p className="text-sm text-gray-500">{title}</p>
+      <p className="font-bold text-lg">{value}</p>
+    </div>
+  );
+}

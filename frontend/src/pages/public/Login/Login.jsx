@@ -12,29 +12,39 @@ export default function Login() {
   const { loginUser } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setError("");
+  setLoading(true);
 
-    try {
-      const res = await login(form);
+  try {
+    const res = await login(form);
 
-      // 👉 Se MFA for necessário
-      if (res.data.mfaRequired) {
-        navigate("/mfa");
-        return;
-      }
-
-      loginUser(res.data.user);
-      navigate("/dashboard");
-
-    } catch (err) {
-      setError("Credenciais inválidas");
-    } finally {
-      setLoading(false);
+    // 👉 MFA
+    if (res.data.mfaRequired) {
+      navigate("/mfa");
+      return;
     }
-  };
+
+    // 👉 Guardas apenas o user (não token)
+    loginUser(res.data.user);
+
+    // 👉 Redirecionamento por role
+    const role = res.data.user.role;
+
+    if (role === "ADMIN") navigate("/admin");
+    else if (role === "PROFESSOR") navigate("/professor");
+    else navigate("/student");
+
+  } catch (err) {
+    setError("Credenciais inválidas");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+  
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
