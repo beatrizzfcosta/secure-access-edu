@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta, timezone
-import os
 import jwt
 from argon2 import PasswordHasher
 from flask import request, jsonify, current_app

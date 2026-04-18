@@ -4,12 +4,13 @@ import io
 from flask import Blueprint, request, jsonify
 import qrcode
 
-from auth.service import generate_token, authenticate_user, verify_otp
+from auth.service import generate_token, authenticate_user, hash_password, verify_otp
 from auth.service import require_auth
+from backend.app.data import users
 from rbac.service import require_roles
 
 from app.data.users import get_user_by_username, get_user_by_id
-from app.data.tasks import get_tasks, create_task as create_task_data
+from app.data.tasks import get_tasks as get_tasks_data, create_task as create_task_data
 
 from observability.logger import log_info, audit_log
 
@@ -59,10 +60,12 @@ def login():
 @require_roles("student", "teacher", "admin")
 def get_tasks():
     user = request.user
+    tasks = get_tasks_data()
 
     return jsonify({
         "msg": "tasks fetched",
-        "user": user
+        "user": user,
+        "tasks": tasks
     })
 
 @api.route("/tasks", methods=["POST"])
@@ -123,3 +126,80 @@ def verify_2fa():
     user["otp_enabled"] = True
 
     return {"message": "2FA enabled"}
+
+@api.route("/me", methods=["GET"])
+@require_auth
+def me():
+    return jsonify(request.user)
+
+@api.route("/register", methods=["POST"])
+def register():
+    data = request.get_json(silent=True)
+
+    if not data:
+        return {"error": "Invalid JSON"}, 400
+
+    username = data.get("username")
+    password = data.get("password")
+
+    if not username or not password:
+        return {"error": "Username and password required"}, 400
+
+    if get_user_by_username(username):
+        return {"error": "User already exists"}, 400
+
+    user = {
+        "id": len(users) + 1,
+        "username": username,
+        "password": hash_password(password),
+        "role": "student",
+        "otp_secret": None,
+        "otp_enabled": False
+    }
+
+    users.append(user)
+
+    return {"message": "User created"}, 201
+
+@api.route("/tasks/<int:task_id>", methods=["GET"])
+@require_auth
+def get_task(task_id):
+    task = next((t for t in get_tasks_data() if t["id"] == task_id), None)
+
+    if not task:
+        return {"error": "Task not found"}, 404
+
+    return jsonify(task)
+
+@api.route("/tasks/<int:task_id>", methods=["PUT"])
+@require_auth
+@require_roles("teacher", "admin")
+def update_task(task_id):
+    data = request.get_json(silent=True)
+
+    if not data:
+        return {"error": "Invalid JSON"}, 400
+
+    tasks = get_tasks_data()
+    task = next((t for t in tasks if t["id"] == task_id), None)
+
+    if not task:
+        return {"error": "Task not found"}, 404
+
+    task.update(data)
+
+    return jsonify(task)
+
+@api.route("/tasks/<int:task_id>", methods=["DELETE"])
+@require_auth
+@require_roles("admin")
+def delete_task(task_id):
+    tasks = get_tasks_data()
+    task = next((t for t in tasks if t["id"] == task_id), None)
+
+    if not task:
+        return {"error": "Task not found"}, 404
+
+    tasks.remove(task)
+
+    return {"message": "Task deleted"}
