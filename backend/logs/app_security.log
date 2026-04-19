@@ -1,0 +1,18 @@
+INFO | 2026-04-19 02:34:02,922 | [IP: 127.0.0.1] | [GET] User: Pedro_Admin, Message: Acedeu à rota de teste
+WARNING | 2026-04-19 02:34:02,923 | [IP: 127.0.0.1] | ! SEC_EVENT | USER: Anonymous_Hacker | Tentativa de injeção de SQL detetada no parâmetro ID
+INFO | 2026-04-19 02:34:02,923 | [IP: 127.0.0.1] | AUDIT | Action: DELETE_TASK | User: Admin_01 | Details: Apagou a tarefa ID 99
+ERROR | 2026-04-19 02:34:02,938 | [IP: 127.0.0.1] | SYSTEM_ERROR: 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
+Traceback (most recent call last):
+  File "C:\Users\pedro\AppData\Local\Programs\Python\Python313\Lib\site-packages\flask\app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "C:\Users\pedro\AppData\Local\Programs\Python\Python313\Lib\site-packages\flask\app.py", line 841, in dispatch_request
+    self.raise_routing_exception(req)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Users\pedro\AppData\Local\Programs\Python\Python313\Lib\site-packages\flask\app.py", line 450, in raise_routing_exception
+    raise request.routing_exception  # type: ignore
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\pedro\AppData\Local\Programs\Python\Python313\Lib\site-packages\flask\ctx.py", line 353, in match_request
+    result = self.url_adapter.match(return_rule=True)  # type: ignore
+  File "C:\Users\pedro\AppData\Local\Programs\Python\Python313\Lib\site-packages\werkzeug\routing\map.py", line 629, in match
+    raise NotFound() from None
+werkzeug.exceptions.NotFound: 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
