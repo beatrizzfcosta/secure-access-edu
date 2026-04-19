@@ -1,0 +1,20 @@
+# Instalar dependências
+
+npm install
+npm install react-router-dom axios
+
+
+## style
+
+npm install -D tailwindcss@3 postcss autoprefixer
+npx tailwindcss init -p
+
+## adicionar contexto no ficheiro tailwind.config.js
+  content: [
+    "./index.html",
+    "./src/**/*.{js,jsx,ts,tsx}",
+  ],
+
+# Rodar o Servidor
+npm run dev
+
