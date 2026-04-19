@@ -1,5 +1,6 @@
 from flask import jsonify
-import logging
+
+from observability.logger import logger, log_security_event
 
 def init_error_handlers(app):
     """
@@ -9,7 +10,8 @@ def init_error_handlers(app):
     @app.errorhandler(Exception)
     def handle_global_exception(e):
         # Regista o erro real no log (para auditoria interna - RF23)
-        logging.error(f"Erro Crítico: {str(e)}", exc_info=True)
+        logger.error(f"Erro Crítico: {str(e)}", exc_info=True)
+        log_security_event("ERROR", f"Unhandled exception: {str(e)}")
         
         # RF27: Mensagem segura (sem leaks de infraestrutura)
         return jsonify({
@@ -20,5 +22,6 @@ def init_error_handlers(app):
     @app.errorhandler(403)
     def handle_forbidden(e):
         # Regista tentativa de violação de RBAC (RF22)
-        logging.warning("Tentativa de acesso não autorizado bloqueada.")
+        logger.warning("Tentativa de acesso não autorizado bloqueada.")
+        log_security_event("WARNING", "Blocked unauthorized access attempt")
         return jsonify({"message": "Acesso negado: Permissões insuficientes."}), 403

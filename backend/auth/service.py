@@ -14,7 +14,8 @@ def authenticate_user(user, password):
     if not user:
         return None
 
-    if not verify_password(user["password"], password):
+    password_hash = user.get("password") or user.get("password_hash")
+    if not password_hash or not verify_password(password_hash, password):
         return None
 
     return user
@@ -37,7 +38,7 @@ def generate_access_token(user):
     payload = {
         "user_id": user["id"],
         "username": user["username"],
-        "role": user["role"],
+        "role": user.get("role", "student"),
         "type": "access",
         "exp": datetime.now(timezone.utc) + timedelta(minutes=15)
     }
@@ -51,7 +52,7 @@ def generate_refresh_token(user):
     payload = {
         "user_id": user["id"],
         "username": user["username"],
-        "role": user["role"],
+        "role": user.get("role", "student"),
         "type": "refresh",
         "jti": str(uuid.uuid4()),
         "exp": datetime.now(timezone.utc) + timedelta(days=7)
