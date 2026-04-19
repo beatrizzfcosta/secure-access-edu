@@ -1,0 +1,37 @@
+name: secureacad
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: secureacad-postgres
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - secureacad_pgdata:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: ./backend
+    container_name: secureacad-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    ports:
+      # 5000 costuma estar ocupado no macOS (ex.: AirPlay); host usa 5001 por defeito.
+      - "${API_PORT:-5001}:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  secureacad_pgdata:

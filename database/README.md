@@ -6,14 +6,18 @@ Configuração local da base **PostgreSQL** com Docker Compose.
 
 - [Docker](https://docs.docker.com/get-docker/) e Docker Compose v2
 
-## Arranque
+## Arranque (Postgres + API na raiz do repositório)
+
+Na raiz do projeto (onde está `docker-compose.yml`):
 
 ```bash
-cd database
 cp .env.example .env
-# Editar .env se quiseres user/password/port diferentes
-docker compose up -d
+# Editar .env (password, JWT_SECRET_KEY, POSTGRES_PORT se precisares)
+
+docker compose up -d --build
 ```
+
+A API fica em `http://localhost:5001` por defeito (`API_PORT` no `.env` da raiz; dentro do contentor continua na 5000). O Postgres expõe a porta em `POSTGRES_PORT` no `.env` da raiz.
 
 Ver estado:
 
@@ -21,7 +25,7 @@ Ver estado:
 docker compose ps
 ```
 
-O ficheiro `.env` não deve ser commitado; usa `.env.example` como modelo.
+O `.env` na raiz não deve ser commitado; usa `.env.example` na raiz como modelo. Os ficheiros `database/.env` e `backend/.env` continuam úteis para desenvolvimento só-BD ou só-backend no host.
 
 ## Ligação manual
 
@@ -61,9 +65,11 @@ Ficheiros em `init/` (por ordem):
 2. `02-schema.sql` — tabelas e índices
 3. `03-seed-rbac.sql` — papéis `student` / `teacher` / `admin` e permissões (`user.create` / `user.update` / `user.manage_roles` só na prática para **admin**, via *cross join*; estudante e docente sem criação de utilizadores)
 
-Executam-se **apenas na primeira criação** do volume (dados vazios). Para voltar a aplicar do zero: `docker compose down -v` (apaga dados) e `docker compose up -d`.
+Executam-se **apenas na primeira criação** do volume (dados vazios). Para voltar a aplicar do zero, na **raiz do repositório**: `docker compose down -v` e depois `docker compose up -d --build`.
 
 ## Parar / apagar dados
+
+Na raiz do repositório:
 
 ```bash
 docker compose down          # mantém o volume com dados

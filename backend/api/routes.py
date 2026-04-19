@@ -1,7 +1,7 @@
 import base64
 import io
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 import qrcode
 
 from auth.service import generate_token, authenticate_user, hash_password, verify_otp
@@ -14,9 +14,23 @@ from app.data.tasks import get_tasks as get_tasks_data, create_task as create_ta
 
 from observability.logger import log_info, audit_log, log_security_event
 
+from app.db import ping_database
+
 import pyotp
 
 api = Blueprint("api", __name__)
+
+
+@api.route("/health/db", methods=["GET"])
+def health_db():
+    dsn = current_app.config.get("DATABASE_URL")
+    if not dsn:
+        return jsonify({"status": "error", "detail": "DATABASE_URL not set"}), 503
+    try:
+        ping_database(dsn)
+    except Exception as exc:
+        return jsonify({"status": "error", "detail": str(exc)}), 503
+    return jsonify({"status": "ok", "database": "reachable"})
 
 @api.route("/login", methods=["POST"])
 def login():
