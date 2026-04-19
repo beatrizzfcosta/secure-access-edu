@@ -63,7 +63,7 @@ export default function Register() {
           {/* HEADER */}
           <div className="text-center mb-8">
             <div className="text-2xl font-bold text-blue-700">
-              Academic Curator
+              Secure access edu
             </div>
 
             <h2 className="text-xl font-semibold mt-4">

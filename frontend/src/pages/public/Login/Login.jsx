@@ -52,7 +52,7 @@ const handleSubmit = async (e) => {
 
         {/* HEADER */}
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold">Academic Curator</h1>
+          <h1 className="text-2xl font-bold">Secure access edu</h1>
           <p className="text-sm text-gray-500">
             Plataforma Segura de Gestão Académica
           </p>

@@ -28,7 +28,7 @@ export default function Sidebar() {
             🎓
           </div>
           <div>
-            <h2 className="font-bold text-blue-700">Curator Pro</h2>
+            <h2 className="font-bold text-blue-700">Secure access edu</h2>
             <p className="text-xs text-gray-500">Academic Management</p>
           </div>
         </div>
