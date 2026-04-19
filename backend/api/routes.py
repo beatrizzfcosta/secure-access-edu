@@ -6,13 +6,13 @@ import qrcode
 
 from auth.service import generate_token, authenticate_user, hash_password, verify_otp
 from auth.service import require_auth
-from backend.app.data import users
+from app.data import users
 from rbac.service import require_roles
 
 from app.data.users import get_user_by_username, get_user_by_id
 from app.data.tasks import get_tasks as get_tasks_data, create_task as create_task_data
 
-from observability.logger import log_info, audit_log
+from observability.logger import log_info, audit_log, log_security_event
 
 import pyotp
 
