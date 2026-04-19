@@ -4,7 +4,13 @@ import io
 from flask import Blueprint, request, jsonify, current_app
 import qrcode
 
-from auth.service import generate_token, authenticate_user, hash_password, verify_otp
+from auth.service import (
+    generate_access_token,
+    generate_refresh_token,
+    authenticate_user,
+    hash_password,
+    verify_otp
+)
 from auth.service import require_auth
 from app.data import users
 from rbac.service import require_roles
