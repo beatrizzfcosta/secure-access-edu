@@ -25,6 +25,11 @@ from app.data.users import (
 )
 from psycopg.errors import UniqueViolation
 from app.data.tasks import get_tasks as get_tasks_data, create_task as create_task_data
+from app.data.admin import (
+    list_users_with_roles,
+    list_roles as list_roles_db,
+    replace_user_roles,
+)
 
 from observability.logger import log_info, audit_log, log_security_event
 
@@ -190,6 +195,76 @@ def verify_2fa():
 @require_auth
 def me():
     return jsonify(request.user)
+
+
+@api.route("/admin/users", methods=["GET"])
+@require_auth
+@require_roles("admin")
+def admin_list_users():
+    dsn = current_app.config.get("DATABASE_URL")
+    if not dsn:
+        return jsonify({"error": "Gestão de utilizadores requer base de dados"}), 503
+    try:
+        users = list_users_with_roles(dsn)
+        return jsonify({"users": users})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@api.route("/admin/roles", methods=["GET"])
+@require_auth
+@require_roles("admin")
+def admin_list_roles():
+    dsn = current_app.config.get("DATABASE_URL")
+    if not dsn:
+        return jsonify({"error": "Gestão de papéis requer base de dados"}), 503
+    try:
+        roles = list_roles_db(dsn)
+        return jsonify({"roles": roles})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@api.route("/admin/users/<uuid:user_id>/roles", methods=["PATCH"])
+@require_auth
+@require_roles("admin")
+def admin_patch_user_roles(user_id):
+    dsn = current_app.config.get("DATABASE_URL")
+    if not dsn:
+        return jsonify({"error": "Gestão de utilizadores requer base de dados"}), 503
+
+    data = request.get_json(silent=True)
+    if not data or not isinstance(data.get("roles"), list):
+        return jsonify({"error": "Body JSON com lista 'roles' obrigatória"}), 400
+
+    raw_roles = data["roles"]
+    role_names = [str(r).strip() for r in raw_roles if str(r).strip()]
+    try:
+        replace_user_roles(dsn, str(user_id), role_names)
+    except ValueError as exc:
+        code = str(exc)
+        if code == "user_not_found":
+            return jsonify({"error": "Utilizador não encontrado"}), 404
+        if code == "invalid_user_id":
+            return jsonify({"error": "ID de utilizador inválido"}), 400
+        if code in ("roles_required", "invalid_role"):
+            return jsonify(
+                {
+                    "error": "Papéis inválidos ou lista vazia",
+                    "detail": code,
+                }
+            ), 400
+        return jsonify({"error": code}), 400
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+    audit_log(
+        "user_roles_updated",
+        user=str(request.user.get("user_id")),
+        details={"target_user": str(user_id), "roles": role_names},
+    )
+    return jsonify({"message": "Papéis atualizados", "roles": role_names})
+
 
 @api.route("/register", methods=["POST"])
 def register():
