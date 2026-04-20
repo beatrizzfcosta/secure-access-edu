@@ -5,3 +5,4 @@ pyotp==2.9.0
 qrcode[pil]==7.4.2
 python-dotenv==1.0.1
 psycopg[binary]==3.2.4
+flask-cors==6.0.0

@@ -2,13 +2,13 @@
 import api from "./api";
 
 export const login = (credentials) => {
-  return api.post("/auth/login", credentials);
+  return api.post("/login", credentials);
 };
 
 export const logout = () => {
-  return api.post("/auth/logout");
+  return api.post("/logout");
 };
 
 export const getMe = () => {
-  return api.get("/auth/me");
+  return api.get("/me");
 };

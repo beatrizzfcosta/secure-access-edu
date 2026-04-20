@@ -5,7 +5,7 @@ import { useAuth } from "../../../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 
 export default function Login() {
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [form, setForm] = useState({ username: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -77,13 +77,13 @@ const handleSubmit = async (e) => {
 
             {/* EMAIL */}
             <input
-              type="email"
+              type="text"
               placeholder="nome@universidade.edu"
               className="w-full border p-2 rounded"
-              autoComplete="email"
+              autoComplete="text"
               required
               onChange={(e) =>
-                setForm({ ...form, email: e.target.value })
+                setForm({ ...form, username: e.target.value })
               }
             />
 
