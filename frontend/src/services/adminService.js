@@ -19,3 +19,7 @@ export function createAdminUser({ username, email, password, roles }) {
 export function deleteAdminUser(userId) {
   return api.delete(`/admin/users/${userId}`);
 }
+
+export function fetchAdminLogs() {
+  return api.get("/admin/logs");
+}

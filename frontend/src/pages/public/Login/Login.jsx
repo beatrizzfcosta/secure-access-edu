@@ -127,6 +127,8 @@ export default function Login() {
   };
 
   const goBackToCredentials = () => {
+    setUsername("");
+    setPassword("");
     setStep("credentials");
     setOtp("");
     setError("");
