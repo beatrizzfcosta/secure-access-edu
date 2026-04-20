@@ -1,6 +1,8 @@
-// src/pages/public/MFA/MFA.jsx
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { get2faSetup, verify2faEnrollment } from "../../../services/authService";
+import { pathForRole } from "../../../utils/roles";
+import { useAuth } from "../../../hooks/useAuth";
 
 export default function MFA() {
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
@@ -8,11 +10,33 @@ export default function MFA() {
   const [error, setError] = useState(false);
   const [timeLeft, setTimeLeft] = useState(30);
   const [cooldown, setCooldown] = useState(30);
+  const [qrDataUrl, setQrDataUrl] = useState("");
+  const [setupLoading, setSetupLoading] = useState(true);
 
   const inputsRef = useRef([]);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
-  // ⏱️ TIMER EXPIRAÇÃO
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await get2faSetup();
+        const b64 = res.data?.qr;
+        if (!cancelled && b64) {
+          setQrDataUrl(`data:image/png;base64,${b64}`);
+        }
+      } catch {
+        if (!cancelled) setError(true);
+      } finally {
+        if (!cancelled) setSetupLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
@@ -24,7 +48,6 @@ export default function MFA() {
     return () => clearInterval(timer);
   }, []);
 
-  // 🔁 COOLDOWN REENVIO
   useEffect(() => {
     if (cooldown <= 0) return;
 
@@ -35,7 +58,6 @@ export default function MFA() {
     return () => clearInterval(timer);
   }, [cooldown]);
 
-  // ✏️ INPUT CHANGE
   const handleChange = (value, index) => {
     if (!/^\d?$/.test(value)) return;
 
@@ -48,14 +70,12 @@ export default function MFA() {
     }
   };
 
-  // ⬅️ BACKSPACE
   const handleKeyDown = (e, index) => {
     if (e.key === "Backspace" && !otp[index] && index > 0) {
       inputsRef.current[index - 1].focus();
     }
   };
 
-  // 📋 PASTE
   const handlePaste = (e) => {
     e.preventDefault();
     const paste = e.clipboardData.getData("text").slice(0, 6);
@@ -72,7 +92,6 @@ export default function MFA() {
     });
   };
 
-  // ✅ SUBMIT
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -81,54 +100,48 @@ export default function MFA() {
     const code = otp.join("");
 
     try {
-      // 👉 aqui vais chamar backend
-      console.log("OTP:", code);
-
-      // simulação
-      await new Promise((r) => setTimeout(r, 1200));
-
-      const success = code === "123456"; // mock
-
-      if (!success) {
-        throw new Error();
+      if (code.length !== 6) {
+        throw new Error("invalid");
       }
-
-      navigate("/dashboard");
-
+      await verify2faEnrollment(code);
+      navigate(user?.role ? pathForRole(user.role) : "/dashboard");
     } catch {
       setError(true);
       setOtp(["", "", "", "", "", ""]);
-      inputsRef.current[0].focus();
+      inputsRef.current[0]?.focus();
     } finally {
       setLoading(false);
     }
   };
 
-  // 🔁 REENVIAR
   const handleResend = () => {
     setCooldown(30);
     setTimeLeft(30);
     setError(false);
   };
 
+  const maskedEmail =
+    user?.username != null
+      ? `${String(user.username).slice(0, 2)}***`
+      : "m******@email.com";
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
-
       <div className="bg-white p-8 rounded-xl shadow-md w-full max-w-md">
-
         <div className="text-center mb-6">
           <h1 className="text-xl font-bold">Verificação de Segurança</h1>
           <p className="text-sm text-gray-500">
-            Código enviado para o seu dispositivo
+            Confirme o código da sua app de autenticação
           </p>
-          <p className="text-sm text-blue-600 font-semibold">
-            m******@email.com
-          </p>
+          {qrDataUrl && !setupLoading && (
+            <div className="mt-4 flex justify-center">
+              <img src={qrDataUrl} alt="" className="w-24 h-24" />
+            </div>
+          )}
+          <p className="text-sm text-blue-600 font-semibold">{maskedEmail}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-
-          {/* OTP INPUTS */}
           <div className="flex justify-between gap-2" onPaste={handlePaste}>
             {otp.map((digit, index) => (
               <input
@@ -144,7 +157,6 @@ export default function MFA() {
             ))}
           </div>
 
-          {/* TIMER */}
           <p className="text-sm text-center text-gray-500">
             Código expira em{" "}
             <span className={timeLeft === 0 ? "text-red-500" : "text-blue-600"}>
@@ -152,23 +164,20 @@ export default function MFA() {
             </span>
           </p>
 
-          {/* ERRO */}
           {error && (
             <div className="text-red-600 text-sm text-center">
               Código inválido ou expirado
             </div>
           )}
 
-          {/* BOTÃO */}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || setupLoading}
             className="w-full bg-blue-600 text-white py-2 rounded"
           >
             {loading ? "Verificando..." : "Verificar e Entrar"}
           </button>
 
-          {/* REENVIAR */}
           <button
             type="button"
             onClick={handleResend}
@@ -177,9 +186,7 @@ export default function MFA() {
           >
             Reenviar código {cooldown > 0 && `(${cooldown}s)`}
           </button>
-
         </form>
-
       </div>
     </div>
   );

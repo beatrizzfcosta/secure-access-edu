@@ -1,14 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-// 👉 cria depois este service
-// import { register } from "../../../services/authService";
+import { registerAccount } from "../../../services/authService";
 
 export default function Register() {
   const [form, setForm] = useState({
     name: "",
     email: "",
     password: "",
-    confirmPassword: ""
+    confirmPassword: "",
   });
 
   const [error, setError] = useState("");
@@ -24,7 +23,6 @@ export default function Register() {
     e.preventDefault();
     setError("");
 
-    // 🔐 validação básica
     if (form.password !== form.confirmPassword) {
       setError("As palavras-passe não coincidem");
       return;
@@ -35,19 +33,26 @@ export default function Register() {
       return;
     }
 
+    const username = form.name.trim();
+    if (!username) {
+      setError("Indique o nome de utilizador");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // 👉 chamada real backend
-      // await register(form);
-
-      await new Promise((r) => setTimeout(r, 1200));
-
-      // 🚀 fluxo correto → MFA setup
-      navigate("/mfa/setup");
-
-    } catch {
-      setError("Erro ao criar conta");
+      await registerAccount({
+        username,
+        password: form.password,
+        email: form.email.trim(),
+      });
+      navigate("/login");
+    } catch (err) {
+      const msg = err.response?.data?.error;
+      setError(
+        typeof msg === "string" ? msg : "Erro ao criar conta. Tente novamente."
+      );
     } finally {
       setLoading(false);
     }
@@ -55,30 +60,21 @@ export default function Register() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-
       <main className="flex-grow flex items-center justify-center px-4 py-12">
-
         <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8">
-
-          {/* HEADER */}
           <div className="text-center mb-8">
             <div className="text-2xl font-bold text-blue-700">
               Secure access edu
             </div>
 
-            <h2 className="text-xl font-semibold mt-4">
-              Criar Conta
-            </h2>
+            <h2 className="text-xl font-semibold mt-4">Criar Conta</h2>
 
             <p className="text-sm text-gray-500 mt-2">
               Junte-se à nossa plataforma académica
             </p>
           </div>
 
-          {/* FORM */}
           <form onSubmit={handleSubmit} className="space-y-4">
-
-            {/* NOME */}
             <input
               type="text"
               placeholder="Nome completo"
@@ -88,7 +84,6 @@ export default function Register() {
               required
             />
 
-            {/* EMAIL */}
             <input
               type="email"
               placeholder="Email institucional"
@@ -98,7 +93,6 @@ export default function Register() {
               required
             />
 
-            {/* PASSWORD */}
             <input
               type="password"
               placeholder="Palavra-passe"
@@ -108,7 +102,6 @@ export default function Register() {
               required
             />
 
-            {/* CONFIRM */}
             <input
               type="password"
               placeholder="Confirmar palavra-passe"
@@ -118,14 +111,8 @@ export default function Register() {
               required
             />
 
-            {/* ERRO */}
-            {error && (
-              <div className="text-red-600 text-sm">
-                {error}
-              </div>
-            )}
+            {error && <div className="text-red-600 text-sm">{error}</div>}
 
-            {/* BOTÃO */}
             <button
               type="submit"
               disabled={loading}
@@ -133,10 +120,8 @@ export default function Register() {
             >
               {loading ? "A criar conta..." : "Criar Conta"}
             </button>
-
           </form>
 
-          {/* LOGIN LINK */}
           <p className="text-sm text-center mt-6">
             Já tem conta?{" "}
             <span
@@ -146,11 +131,8 @@ export default function Register() {
               Iniciar sessão
             </span>
           </p>
-
         </div>
-
       </main>
-
     </div>
   );
 }

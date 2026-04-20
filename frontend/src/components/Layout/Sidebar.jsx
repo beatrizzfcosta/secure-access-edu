@@ -13,7 +13,7 @@ export default function Sidebar() {
 
   const handleNewRequest = () => {
     if (user?.role === ROLES.ADMIN || user?.role === ROLES.PROFESSOR) {
-      navigate("/professor/tasks/create");
+      navigate("/professor/tasks");
     } else {
       navigate("/student/tasks");
     }
@@ -39,6 +39,23 @@ export default function Sidebar() {
           <button onClick={() => navigate("/dashboard")} className="block w-full text-left p-2 rounded bg-white text-blue-600">
             Dashboard
           </button>
+
+          {user?.role === ROLES.ADMIN && (
+            <>
+              <button
+                onClick={() => navigate("/admin/")}
+                className="block w-full text-left p-2 hover:bg-white rounded"
+              >
+                Admin
+              </button>
+              <button
+                onClick={() => navigate("/admin/users")}
+                className="block w-full text-left p-2 hover:bg-white rounded"
+              >
+                Utilizadores
+              </button>
+            </>
+          )}
 
           <button onClick={() => handleNewRequest()} className="block w-full text-left p-2 hover:bg-white rounded">
             Tasks

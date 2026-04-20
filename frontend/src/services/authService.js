@@ -35,3 +35,15 @@ export const logout = () => {
 export const getMe = () => {
   return api.get("/me");
 };
+
+export function registerAccount({ username, password, email }) {
+  return api.post("/register", { username, password, email });
+}
+
+export function get2faSetup() {
+  return api.get("/2fa/setup");
+}
+
+export function verify2faEnrollment(otp) {
+  return api.post("/2fa/verify", { otp });
+}
