@@ -112,8 +112,12 @@ def verify_otp(user, code):
 
 
 def login_requires_otp(user) -> bool:
-    """Basta existir segredo TOTP na conta (setup feito) para obrigar OTP no login."""
-    return bool(user.get("otp_secret"))
+    """Exige OTP no login só depois do utilizador confirmar o primeiro código (totp_enabled).
+
+    O GET /2fa/setup gera e guarda o segredo antes do enrollment; sem este check o login
+    pediria 2FA só por terem aberto a página de configuração.
+    """
+    return bool(user.get("otp_secret")) and bool(user.get("otp_enabled"))
 
 
 __all__ = [
