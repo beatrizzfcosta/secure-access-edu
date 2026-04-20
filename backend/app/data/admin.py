@@ -150,3 +150,13 @@ def create_user_as_admin(
                 )
 
     return str(new_id)
+
+
+def delete_user_by_id(dsn: str, user_id: str) -> None:
+    """Apaga utilizador. Falha com ForeignKeyViolation se existir tarefa created_by/assigned_by."""
+    uid = _require_uuid(user_id)
+    with get_connection(dsn) as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM users WHERE id = %s", (uid,))
+            if cur.rowcount == 0:
+                raise ValueError("user_not_found")

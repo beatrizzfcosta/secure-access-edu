@@ -23,13 +23,14 @@ from app.data.users import (
     register_user_fallback,
     create_user_with_student_role,
 )
-from psycopg.errors import UniqueViolation
+from psycopg.errors import UniqueViolation, ForeignKeyViolation
 from app.data.tasks import get_tasks as get_tasks_data, create_task as create_task_data
 from app.data.admin import (
     list_users_with_roles,
     list_roles as list_roles_db,
     replace_user_roles,
     create_user_as_admin,
+    delete_user_by_id,
 )
 
 from observability.logger import log_info, audit_log, log_security_event
@@ -286,6 +287,43 @@ def admin_list_roles():
         return jsonify({"roles": roles})
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
+
+
+@api.route("/admin/users/<uuid:user_id>", methods=["DELETE"])
+@require_auth
+@require_roles("admin")
+def admin_delete_user(user_id):
+    dsn = current_app.config.get("DATABASE_URL")
+    if not dsn:
+        return jsonify({"error": "Gestão de utilizadores requer base de dados"}), 503
+
+    if str(user_id) == str(request.user.get("user_id")):
+        return jsonify({"error": "Não pode eliminar a sua própria conta"}), 400
+
+    try:
+        delete_user_by_id(dsn, str(user_id))
+    except ValueError as exc:
+        if str(exc) == "invalid_user_id":
+            return jsonify({"error": "ID de utilizador inválido"}), 400
+        if str(exc) == "user_not_found":
+            return jsonify({"error": "Utilizador não encontrado"}), 404
+        return jsonify({"error": str(exc)}), 400
+    except ForeignKeyViolation:
+        return jsonify(
+            {
+                "error": "Não é possível eliminar: o utilizador criou ou atribuiu tarefas. "
+                "Apague ou reatribua essas tarefas primeiro (ou use SQL na BD).",
+            }
+        ), 409
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+    audit_log(
+        "user_deleted_by_admin",
+        user=str(request.user.get("user_id")),
+        details={"deleted_user_id": str(user_id)},
+    )
+    return jsonify({"message": "Utilizador eliminado"}), 200
 
 
 @api.route("/admin/users/<uuid:user_id>/roles", methods=["PATCH"])

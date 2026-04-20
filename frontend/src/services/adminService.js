@@ -15,3 +15,7 @@ export function patchUserRoles(userId, roles) {
 export function createAdminUser({ username, email, password, roles }) {
   return api.post("/admin/users", { username, email, password, roles });
 }
+
+export function deleteAdminUser(userId) {
+  return api.delete(`/admin/users/${userId}`);
+}
