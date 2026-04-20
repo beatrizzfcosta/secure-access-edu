@@ -91,15 +91,29 @@ def require_auth(f):
     return wrapper
 
 
+def _otp_code_digits(code) -> str:
+    if code is None:
+        return ""
+    return "".join(c for c in str(code).strip() if c.isdigit())
+
+
 def verify_otp(user, code):
-    if not user.get("otp_enabled"):
+    """Valida TOTP se existir segredo; sem segredo não há MFA no login."""
+    secret = user.get("otp_secret")
+    if not secret:
         return True
 
-    if not code:
+    digits = _otp_code_digits(code)
+    if not digits:
         return False
 
-    totp = pyotp.TOTP(user["otp_secret"])
-    return totp.verify(code, valid_window=1)
+    totp = pyotp.TOTP(str(secret).strip())
+    return totp.verify(digits, valid_window=1)
+
+
+def login_requires_otp(user) -> bool:
+    """Basta existir segredo TOTP na conta (setup feito) para obrigar OTP no login."""
+    return bool(user.get("otp_secret"))
 
 
 __all__ = [
@@ -109,5 +123,6 @@ __all__ = [
     "generate_access_token",
     "generate_refresh_token",
     "require_auth",
-    "verify_otp"
+    "verify_otp",
+    "login_requires_otp",
 ]

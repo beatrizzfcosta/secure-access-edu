@@ -9,7 +9,8 @@ from auth.service import (
     generate_refresh_token,
     authenticate_user,
     hash_password,
-    verify_otp
+    verify_otp,
+    login_requires_otp,
 )
 from auth.service import require_auth
 from rbac.service import require_roles
@@ -66,21 +67,39 @@ def login():
         log_info(request.method, username, f"Login failed for {username}")
         audit_log("login_failed", user=username)
         return jsonify({"error": "Invalid credentials"}), 401
-    
-    if user.get("otp_enabled"):
+
+    if user.get("otp_enabled") and not user.get("otp_secret"):
+        log_security_event(
+            "ERROR",
+            "MFA enabled without stored secret",
+            user_id=str(user.get("id", "")),
+        )
+        return jsonify({"error": "MFA misconfigured for this account"}), 503
+
+    if login_requires_otp(user):
         otp_code = data.get("otp")
-        if not otp_code:
-            return {"error": "OTP required"}, 401
+        if not otp_code or not str(otp_code).strip():
+            return jsonify({"error": "OTP required", "mfa_required": True}), 401
 
         if not verify_otp(user, otp_code):
-            return {"error": "Invalid OTP"}, 401
-    
+            audit_log("login_failed_otp", user=username)
+            return jsonify({"error": "Invalid OTP"}), 401
+
     token = generate_access_token(user)
 
     log_info(request.method, username, f"Login successful for {username}")
     audit_log("login_success", user=username)
 
-    return jsonify({"token": token}), 200
+    return jsonify(
+        {
+            "token": token,
+            "user": {
+                "user_id": user["id"],
+                "username": user["username"],
+                "role": user["role"],
+            },
+        }
+    ), 200
 
 @api.route("/tasks", methods=["GET"])
 @require_auth
@@ -135,29 +154,37 @@ def setup_2fa():
 
     return {"qr": qr_base64}
 
+def _normalize_totp_code(raw) -> str | None:
+    if raw is None:
+        return None
+    digits = "".join(c for c in str(raw).strip() if c.isdigit())
+    return digits if digits else None
+
+
 @api.route("/2fa/verify", methods=["POST"])
 @require_auth
 def verify_2fa():
     data = request.json
     if not data:
-        return {"error": "Missing JSON"}, 400
-    
-    code = data.get("otp")
+        return jsonify({"error": "Missing JSON"}), 400
+
+    code = _normalize_totp_code(data.get("otp"))
     if not code:
-        return {"error": "OTP required"}, 400
+        return jsonify({"error": "OTP required"}), 400
 
     user = get_user_by_id(request.user["user_id"])
     if not user or not user.get("otp_secret"):
         return jsonify({"error": "2FA not initialized"}), 400
 
-    totp = pyotp.TOTP(user["otp_secret"])
+    totp = pyotp.TOTP(str(user["otp_secret"]).strip())
 
-    if not totp.verify(code):
-        return {"error": "Invalid OTP"}, 400
+    # Mesma tolerância de relógio que no login (±1 intervalo de 30s)
+    if not totp.verify(code, valid_window=1):
+        return jsonify({"error": "Invalid OTP"}), 400
 
     set_user_totp_enabled(user["id"], True)
 
-    return {"message": "2FA enabled"}
+    return jsonify({"message": "2FA enabled"})
 
 @api.route("/me", methods=["GET"])
 @require_auth

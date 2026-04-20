@@ -1,6 +1,10 @@
-// src/context/AuthContext.jsx
 import { createContext, useState, useEffect } from "react";
-import { getMe } from "../services/authService";
+import {
+  getMe,
+  getAccessToken,
+  clearAccessToken,
+  normalizeUser,
+} from "../services/authService";
 
 export const AuthContext = createContext();
 
@@ -8,22 +12,29 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 🔄 Verifica sessão ao carregar app
   useEffect(() => {
+    if (!getAccessToken()) {
+      setLoading(false);
+      return;
+    }
+
     getMe()
-      .then(res => {
-        console.log("USER:", res.data);
-        setUser(res.data);
+      .then((res) => {
+        setUser(normalizeUser(res.data));
       })
-      .catch(err => {
-        console.log("ERRO getMe:", err);
+      .catch(() => {
+        clearAccessToken();
         setUser(null);
       })
       .finally(() => setLoading(false));
   }, []);
 
-  const loginUser = (userData) => setUser(userData);
-  const logoutUser = () => setUser(null);
+  const loginUser = (userData) => setUser(normalizeUser(userData));
+
+  const logoutUser = () => {
+    clearAccessToken();
+    setUser(null);
+  };
 
   return (
     <AuthContext.Provider value={{ user, loginUser, logoutUser, loading }}>

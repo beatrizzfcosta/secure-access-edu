@@ -7,6 +7,7 @@ from flask_cors import CORS
 
 _DEFAULT_CORS_ORIGINS = (
     "http://localhost:5173,"
+    "http://127.0.0.1:5173,"
     "http://localhost:3000,"
     "http://127.0.0.1:3000"
 )
@@ -21,7 +22,9 @@ def create_app():
     CORS(
         app,
         resources={r"/*": {"origins": cors_origins}},
-        supports_credentials=True
+        supports_credentials=True,
+        allow_headers=["Content-Type", "Authorization"],
+        methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     )
 
     app.config.from_object(Config)

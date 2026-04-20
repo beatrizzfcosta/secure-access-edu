@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
+import { ROLES } from "../../utils/roles";
 
 export default function Sidebar() {
   const navigate = useNavigate();
@@ -11,7 +12,7 @@ export default function Sidebar() {
   };
 
   const handleNewRequest = () => {
-    if (user?.role === "ADMIN" || user?.role === "PROFESSOR") {
+    if (user?.role === ROLES.ADMIN || user?.role === ROLES.PROFESSOR) {
       navigate("/professor/tasks/create");
     } else {
       navigate("/student/tasks");
