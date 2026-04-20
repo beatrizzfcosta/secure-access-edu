@@ -26,6 +26,11 @@ def create_app():
 
     app.config.from_object(Config)
 
+    if not app.config.get("JWT_SECRET_KEY"):
+        raise ValueError(
+            "JWT_SECRET_KEY não está definido. Define no .env (ex.: JWT_SECRET_KEY=...)."
+        )
+
     from api.routes import api
     app.register_blueprint(api)
 

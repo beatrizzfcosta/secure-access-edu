@@ -12,10 +12,17 @@ from auth.service import (
     verify_otp
 )
 from auth.service import require_auth
-from app.data import users
 from rbac.service import require_roles
 
-from app.data.users import get_user_by_username, get_user_by_id
+from app.data.users import (
+    get_user_by_username,
+    get_user_by_id,
+    ensure_totp_secret,
+    set_user_totp_enabled,
+    register_user_fallback,
+    create_user_with_student_role,
+)
+from psycopg.errors import UniqueViolation
 from app.data.tasks import get_tasks as get_tasks_data, create_task as create_task_data
 
 from observability.logger import log_info, audit_log, log_security_event
@@ -68,7 +75,7 @@ def login():
         if not verify_otp(user, otp_code):
             return {"error": "Invalid OTP"}, 401
     
-    token = generate_token(user)
+    token = generate_access_token(user)
 
     log_info(request.method, username, f"Login successful for {username}")
     audit_log("login_success", user=username)
@@ -104,12 +111,15 @@ def create_task():
 @require_auth
 def setup_2fa():
     user = get_user_by_id(request.user["user_id"])
+    if not user:
+        return jsonify({"error": "User not found"}), 404
 
-    if not user.get("otp_secret"):
-        user["otp_secret"] = pyotp.random_base32()
-        user["otp_enabled"] = False
-    
-    totp = pyotp.TOTP(user["otp_secret"])
+    secret = user.get("otp_secret")
+    if not secret:
+        secret = pyotp.random_base32()
+        ensure_totp_secret(user["id"], secret)
+
+    totp = pyotp.TOTP(secret)
 
     uri = totp.provisioning_uri(
         name=user["username"],
@@ -137,13 +147,15 @@ def verify_2fa():
         return {"error": "OTP required"}, 400
 
     user = get_user_by_id(request.user["user_id"])
+    if not user or not user.get("otp_secret"):
+        return jsonify({"error": "2FA not initialized"}), 400
 
     totp = pyotp.TOTP(user["otp_secret"])
 
     if not totp.verify(code):
         return {"error": "Invalid OTP"}, 400
 
-    user["otp_enabled"] = True
+    set_user_totp_enabled(user["id"], True)
 
     return {"message": "2FA enabled"}
 
@@ -168,18 +180,18 @@ def register():
     if get_user_by_username(username):
         return {"error": "User already exists"}, 400
 
-    user = {
-        "id": len(users) + 1,
-        "username": username,
-        "password": hash_password(password),
-        "role": "student",
-        "otp_secret": None,
-        "otp_enabled": False
-    }
+    pwd_hash = hash_password(password)
+    dsn = current_app.config.get("DATABASE_URL")
+    if dsn:
+        email = (data.get("email") or "").strip() or f"{username}@users.local"
+        try:
+            create_user_with_student_role(dsn, username, pwd_hash, email)
+        except UniqueViolation:
+            return jsonify({"error": "User already exists"}), 400
+        return jsonify({"message": "User created"}), 201
 
-    users.append(user)
-
-    return {"message": "User created"}, 201
+    register_user_fallback(username, pwd_hash)
+    return jsonify({"message": "User created"}), 201
 
 @api.route("/tasks/<int:task_id>", methods=["GET"])
 @require_auth

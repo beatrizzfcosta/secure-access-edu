@@ -10,7 +10,7 @@ def require_roles(*role):
             if not user:
                 return jsonify({"error": "Unauthorized"}), 401
             
-            if user.get("role") != role:
+            if user.get("role") not in role:
                 return jsonify({"error": "Forbidden"}), 403
         
             return f(*args, **kwargs)
