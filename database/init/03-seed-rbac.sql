@@ -41,3 +41,20 @@ FROM roles r
 CROSS JOIN permissions p
 WHERE r.name = 'admin'
 ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+
+INSERT INTO users (username, password_hash, email, created_by)
+VALUES (
+    'devadmin',
+    '$argon2id$v=19$m=65536,t=3,p=4$tJgiS4gxF64u1qxj6WPXDg$LWdWQHtN5XAD5Xw1OSoJT/AgVdZv3dhN4AHsQdoYTBk',
+    'devadmin@local.test',
+    NULL
+)
+ON CONFLICT (username) DO NOTHING;
+
+INSERT INTO user_roles (user_id, role_id)
+SELECT u.id, r.id
+FROM users u
+JOIN roles r ON r.name = 'admin'
+WHERE u.username = 'devadmin'
+ON CONFLICT DO NOTHING;
