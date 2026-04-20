@@ -97,3 +97,56 @@ def replace_user_roles(dsn: str, user_id: str, role_names: list[str]) -> None:
                     """,
                     (uid, found[name]),
                 )
+
+
+def create_user_as_admin(
+    dsn: str,
+    username: str,
+    password_hash: str,
+    email: str,
+    role_names: list[str],
+    created_by_user_id: str | None,
+) -> str:
+    """Insere utilizador com papéis e created_by (admin). Levanta UniqueViolation em duplicados."""
+    names = sorted({str(n).strip() for n in role_names if str(n).strip()})
+    if not names:
+        raise ValueError("roles_required")
+
+    admin_uuid: uuid.UUID | None = None
+    if created_by_user_id:
+        try:
+            admin_uuid = uuid.UUID(str(created_by_user_id))
+        except ValueError:
+            admin_uuid = None
+
+    with get_connection(dsn) as conn:
+        with conn.cursor() as cur:
+            placeholders = ",".join(["%s"] * len(names))
+            cur.execute(
+                f"SELECT id, name FROM roles WHERE name IN ({placeholders})",
+                names,
+            )
+            found = {r[1]: r[0] for r in cur.fetchall()}
+            if len(found) != len(names):
+                raise ValueError("invalid_role")
+
+            cur.execute(
+                """
+                INSERT INTO users (username, password_hash, email, created_by)
+                VALUES (%s, %s, %s, %s)
+                RETURNING id
+                """,
+                (username, password_hash, email, admin_uuid),
+            )
+            new_id = cur.fetchone()[0]
+
+            for name in names:
+                cur.execute(
+                    """
+                    INSERT INTO user_roles (user_id, role_id)
+                    VALUES (%s, %s)
+                    """,
+                    (new_id, found[name]),
+                )
+
+    return str(new_id)

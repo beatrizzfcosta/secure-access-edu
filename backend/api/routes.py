@@ -29,6 +29,7 @@ from app.data.admin import (
     list_users_with_roles,
     list_roles as list_roles_db,
     replace_user_roles,
+    create_user_as_admin,
 )
 
 from observability.logger import log_info, audit_log, log_security_event
@@ -209,6 +210,68 @@ def admin_list_users():
         return jsonify({"users": users})
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
+
+
+@api.route("/admin/users", methods=["POST"])
+@require_auth
+@require_roles("admin")
+def admin_create_user():
+    dsn = current_app.config.get("DATABASE_URL")
+    if not dsn:
+        return jsonify({"error": "Gestão de utilizadores requer base de dados"}), 503
+
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "JSON inválido"}), 400
+
+    username = (data.get("username") or "").strip()
+    password = data.get("password")
+    email = (data.get("email") or "").strip()
+    if not email and username:
+        email = f"{username}@users.local"
+
+    raw_roles = data.get("roles")
+    if isinstance(raw_roles, list) and raw_roles:
+        role_names = [str(r).strip() for r in raw_roles if str(r).strip()]
+    else:
+        role_names = ["student"]
+
+    if not username or not password:
+        return jsonify({"error": "username e password obrigatórios"}), 400
+
+    if len(str(password)) < 6:
+        return jsonify({"error": "Password demasiado curta (mín. 6 caracteres)"}), 400
+
+    pwd_hash = hash_password(password)
+    admin_id = request.user.get("user_id")
+
+    try:
+        new_id = create_user_as_admin(
+            dsn,
+            username,
+            pwd_hash,
+            email,
+            role_names,
+            str(admin_id) if admin_id else None,
+        )
+    except ValueError as exc:
+        code = str(exc)
+        if code == "roles_required":
+            return jsonify({"error": "Indique pelo menos um papel"}), 400
+        if code == "invalid_role":
+            return jsonify({"error": "Um ou mais papéis são inválidos"}), 400
+        return jsonify({"error": code}), 400
+    except UniqueViolation:
+        return jsonify({"error": "Utilizador ou email já existe"}), 400
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+    audit_log(
+        "user_created_by_admin",
+        user=str(admin_id),
+        details={"new_user_id": new_id, "username": username, "roles": role_names},
+    )
+    return jsonify({"message": "Utilizador criado", "user_id": new_id}), 201
 
 
 @api.route("/admin/roles", methods=["GET"])
