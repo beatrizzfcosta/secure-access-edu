@@ -134,25 +134,39 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold">Secure access edu</h1>
-          <p className="text-sm text-gray-500">
-            Plataforma segura de gestão académica
-          </p>
-          <div className="mt-3 text-green-700 text-xs bg-green-100 px-3 py-1 rounded-full inline-block">
-            Conta protegida com verificação em dois fatores
+  <div className="w-full max-w-xl">
+
+    <div className="bg-white p-6 rounded-2xl shadow-md mb-6">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
+          Secure Access Edu
+        </h1>
+
+        <p className="text-gray-500 text-base mt-2">
+          Plataforma segura de gestão académica
+        </p>
+
+        <div className="mt-4 flex justify-center">
+          <div className="bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm font-medium">
+            Conta protegida com verificação de dois fatores
           </div>
         </div>
+      </div>
+    </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          {step === "credentials" ? (
-            <>
-              <h2 className="text-xl font-semibold mb-2">Entrar na conta</h2>
-              <p className="text-sm text-gray-500 mb-4">
-                Utilizador e palavra-passe. Se a conta tiver 2FA ativo, a seguir
-                pedimos o código da aplicação de autenticação.
-              </p>
+    <div className="bg-white p-6 rounded-2xl shadow-md">
+      {step === "credentials" ? (
+        <>
+          <div className="flex flex-col items-center text-center">
+            <h2 className="text-3xl font-semibold mb-3 text-gray-900">
+              Entrar na conta
+            </h2>
+
+            <p className="text-sm text-gray-500 mb-6 max-w-md leading-relaxed">
+              Se a conta tiver 2FA ativo, de seguida pedimos o código da
+              aplicação de autenticação.
+            </p>
+          </div>
 
               <form onSubmit={handleCredentialsSubmit} className="space-y-4">
                 <input
@@ -190,13 +204,16 @@ export default function Login() {
             </>
           ) : (
             <>
+            <div className="flex flex-col items-center text-center">
               <h2 className="text-xl font-semibold mb-2">
-                Verificação em dois passos
+                Verificação de dois passos
               </h2>
               <p className="text-sm text-gray-500 mb-4">
                 Introduza o código de 6 dígitos da aplicação de autenticação
-                (TOTP) associada à sua conta.
+                (TOTP) associado à sua conta.
               </p>
+            </div>
+             
 
               <form onSubmit={handleOtpSubmit} className="space-y-4">
                 <input
@@ -241,7 +258,7 @@ export default function Login() {
           <p className="text-sm text-center mt-4">
             Não tem uma conta?{" "}
             <a href="/register" className="text-blue-600">
-              Solicitar acesso
+              Criar Conta
             </a>
           </p>
         </div>
