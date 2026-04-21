@@ -6,7 +6,7 @@ import os
 import uuid
 from datetime import datetime, timezone
 
-from auth.service import hash_password
+from auth.service import hash_password, verify_password
 
 from app.db import get_connection
 
@@ -50,6 +50,7 @@ def _row_to_user(cur, row) -> dict | None:
         is_blocked,
         failed_login_count,
         locked_until,
+        password_change_required,
         totp_enabled,
         totp_blob,
     ) = row
@@ -74,6 +75,7 @@ def _row_to_user(cur, row) -> dict | None:
         "role": role,
         "failed_login_count": int(failed_login_count or 0),
         "locked_until": locked_until,
+        "password_change_required": bool(password_change_required),
         "otp_enabled": bool(totp_enabled),
         "otp_secret": _decode_secret(totp_blob),
         "source": "database",
@@ -88,6 +90,12 @@ def _fetch_user_by_username(dsn: str, username: str) -> dict | None:
                 SELECT u.id, u.username, u.password_hash, u.is_blocked,
                       u.failed_login_count,
                       u.locked_until,
+                       (
+                           u.created_by IS NOT NULL
+                           AND NOT EXISTS (
+                               SELECT 1 FROM password_history ph WHERE ph.user_id = u.id
+                           )
+                       ) AS password_change_required,
                        COALESCE(m.totp_enabled, FALSE),
                        m.totp_secret_encrypted
                 FROM users u
@@ -115,6 +123,12 @@ def _fetch_user_by_id(dsn: str, user_id: str) -> dict | None:
                 SELECT u.id, u.username, u.password_hash, u.is_blocked,
                       u.failed_login_count,
                       u.locked_until,
+                       (
+                           u.created_by IS NOT NULL
+                           AND NOT EXISTS (
+                               SELECT 1 FROM password_history ph WHERE ph.user_id = u.id
+                           ) AS password_change_required
+                       ),
                        COALESCE(m.totp_enabled, FALSE),
                        m.totp_secret_encrypted
                 FROM users u
@@ -305,4 +319,94 @@ def reset_failed_login_state(user_id: str) -> None:
                 WHERE id = %s
                 """,
                 (uid,),
+            )
+
+
+def is_password_reused(user_id: str, new_password: str, *, history_limit: int = 5) -> bool:
+    dsn = _dsn()
+    if not dsn:
+        user = get_user_by_id(user_id)
+        return bool(user and verify_password(user["password"], new_password))
+
+    uid = uuid.UUID(str(user_id))
+    limit = max(1, int(history_limit))
+    with get_connection(dsn) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT password_hash FROM users WHERE id = %s", (uid,))
+            row = cur.fetchone()
+            if row and verify_password(row[0], new_password):
+                return True
+
+            cur.execute(
+                """
+                SELECT password_hash
+                FROM password_history
+                WHERE user_id = %s
+                ORDER BY changed_at DESC
+                LIMIT %s
+                """,
+                (uid, limit),
+            )
+            for (old_hash,) in cur.fetchall():
+                if verify_password(old_hash, new_password):
+                    return True
+
+    return False
+
+
+def change_user_password(
+    user_id: str,
+    *,
+    new_password_hash: str,
+    keep_history: int = 5,
+) -> None:
+    dsn = _dsn()
+    if not dsn:
+        user = get_user_by_id(user_id)
+        if not user:
+            raise ValueError("user_not_found")
+        user["password"] = new_password_hash
+        return
+
+    uid = uuid.UUID(str(user_id))
+    keep = max(1, int(keep_history))
+
+    with get_connection(dsn) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT password_hash FROM users WHERE id = %s", (uid,))
+            row = cur.fetchone()
+            if not row:
+                raise ValueError("user_not_found")
+
+            old_hash = row[0]
+            cur.execute(
+                """
+                INSERT INTO password_history (user_id, password_hash)
+                VALUES (%s, %s)
+                """,
+                (uid, old_hash),
+            )
+
+            cur.execute(
+                """
+                UPDATE users
+                SET password_hash = %s
+                WHERE id = %s
+                """,
+                (new_password_hash, uid),
+            )
+
+            cur.execute(
+                """
+                DELETE FROM password_history ph
+                WHERE ph.user_id = %s
+                  AND ph.id IN (
+                      SELECT id
+                      FROM password_history
+                      WHERE user_id = %s
+                      ORDER BY changed_at DESC
+                      OFFSET %s
+                  )
+                """,
+                (uid, uid, keep),
             )

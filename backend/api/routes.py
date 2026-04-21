@@ -10,6 +10,7 @@ from auth.service import (
     decode_token,
     authenticate_user,
     hash_password,
+    verify_password,
     verify_otp,
     login_requires_otp,
 )
@@ -22,6 +23,8 @@ from app.data.users import (
     is_user_temporarily_locked,
     register_failed_login_attempt,
     reset_failed_login_state,
+    is_password_reused,
+    change_user_password,
     ensure_totp_secret,
     set_user_totp_enabled,
     register_user_fallback,
@@ -54,6 +57,34 @@ from app.db import ping_database
 import pyotp
 
 api = Blueprint("api", __name__)
+
+
+_COMMON_COMPROMISED_PASSWORDS = {
+    "12345678",
+    "password",
+    "password123",
+    "qwerty123",
+    "admin123",
+}
+
+
+def _validate_password_policy(password: str):
+    if password is None:
+        raise ValueError("password_required")
+
+    pwd = str(password)
+    if len(pwd) < 8:
+        raise ValueError("password_too_short")
+    if len(pwd) > 128:
+        raise ValueError("password_too_long")
+    if not any(c.isupper() for c in pwd):
+        raise ValueError("password_requires_uppercase")
+    if not any(c.isdigit() for c in pwd):
+        raise ValueError("password_requires_number")
+    if not any(not c.isalnum() for c in pwd):
+        raise ValueError("password_requires_special_char")
+    if pwd.lower() in _COMMON_COMPROMISED_PASSWORDS:
+        raise ValueError("password_compromised")
 
 
 @api.route("/health/db", methods=["GET"])
@@ -152,6 +183,7 @@ def login():
         {
             "token": token,
             "refresh_token": refresh_token,
+            "password_change_required": bool(user.get("password_change_required", False)),
             "user": {
                 "user_id": user["id"],
                 "username": user["username"],
@@ -356,7 +388,60 @@ def verify_2fa():
 @api.route("/me", methods=["GET"])
 @require_auth
 def me():
-    return jsonify(request.user)
+    user = get_user_by_id(str(request.user.get("user_id")))
+    if not user:
+        return jsonify(request.user)
+    payload = dict(request.user)
+    payload["password_change_required"] = bool(user.get("password_change_required", False))
+    return jsonify(payload)
+
+
+@api.route("/password/change", methods=["POST"])
+@require_auth
+def change_password():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "Invalid JSON"}), 400
+
+    old_password = data.get("old_password")
+    new_password = data.get("new_password")
+
+    if not old_password or not new_password:
+        return jsonify({"error": "old_password and new_password required"}), 400
+
+    user_id = str(request.user.get("user_id"))
+    user = get_user_by_id(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    if not verify_password(user["password"], str(old_password)):
+        return jsonify({"error": "Current password is invalid"}), 401
+
+    try:
+        _validate_password_policy(str(new_password))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    if is_password_reused(user_id, str(new_password), history_limit=5):
+        return jsonify({"error": "password_reuse_not_allowed"}), 400
+
+    new_hash = hash_password(str(new_password))
+    try:
+        change_user_password(user_id, new_password_hash=new_hash, keep_history=5)
+    except ValueError as exc:
+        if str(exc) == "user_not_found":
+            return jsonify({"error": "User not found"}), 404
+        return jsonify({"error": str(exc)}), 400
+
+    audit_log("password_changed", user=user.get("username"))
+    try:
+        create_audit_log("password_changed", user_id=user_id)
+    except Exception:
+        pass
+
+    refreshed_user = get_user_by_id(user_id) or user
+    token = generate_access_token(refreshed_user, session_id=request.user.get("sid"))
+    return jsonify({"message": "Password changed", "token": token}), 200
 
 
 @api.route("/admin/users", methods=["GET"])
@@ -402,8 +487,10 @@ def admin_create_user():
     if not username or not password:
         return jsonify({"error": "username e password obrigatórios"}), 400
 
-    if len(str(password)) < 6:
-        return jsonify({"error": "Password demasiado curta (mín. 6 caracteres)"}), 400
+    try:
+        _validate_password_policy(str(password))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
 
     pwd_hash = hash_password(password)
     admin_id = request.user.get("user_id")
@@ -565,6 +652,11 @@ def register():
 
     if not username or not password:
         return {"error": "Username and password required"}, 400
+
+    try:
+        _validate_password_policy(str(password))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
 
     if get_user_by_username(username):
         return {"error": "User already exists"}, 400
