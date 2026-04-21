@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import DashboardLayout from "../../components/Layout/DashboardLayout";
 import { fetchAdminUsers, fetchAdminRoles, fetchAdminLogs } from "../../services/adminService";
 
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
@@ -154,6 +155,14 @@ export default function AdminDashboard() {
         <div className="md:col-span-12 bg-white rounded-xl p-6 shadow-sm">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-xl font-bold">Auditoria</h3>
+
+            <button
+              type="button"
+              className="flex items-center gap-2 text-blue-600 font-semibold hover:opacity-80"
+        >
+              <span className="text-lg">⬇</span>
+              <span>Download</span>
+          </button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
