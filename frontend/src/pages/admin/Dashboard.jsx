@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import DashboardLayout from "../../components/Layout/DashboardLayout";
-import { fetchAdminUsers, fetchAdminRoles } from "../../services/adminService";
+import { fetchAdminUsers, fetchAdminRoles, fetchAdminLogs } from "../../services/adminService";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
+  const [logs, setLogs] = useState([]);
   const [roleCount, setRoleCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -13,18 +14,21 @@ export default function AdminDashboard() {
     let cancelled = false;
     (async () => {
       try {
-        const [uRes, rRes] = await Promise.all([
+        const [uRes, rRes, rLogs] = await Promise.all([
           fetchAdminUsers(),
           fetchAdminRoles(),
+          fetchAdminLogs(),
         ]);
         if (!cancelled) {
           setUsers(uRes.data?.users ?? []);
           setRoleCount((rRes.data?.roles ?? []).length);
+          setLogs(rLogs.data?.logs ?? []);
         }
       } catch {
         if (!cancelled) {
           setUsers([]);
           setRoleCount(0);
+          setLogs([]);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -37,6 +41,7 @@ export default function AdminDashboard() {
 
   const activeUsers = users.filter((u) => !u.is_blocked).length;
   const preview = users.slice(0, 2);
+  const preview_logs = logs.slice(0, 10);
 
   return (
     <DashboardLayout>
@@ -168,12 +173,38 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody id="auditLogs">
-                <tr>
+                {/* <tr>
                   <td className="py-2 text-gray-400" colSpan={4}>
                     Os eventos de auditoria persistidos na BD ainda não estão
                     expostos nesta vista.
                   </td>
-                </tr>
+                </tr> */}
+                {loading ? (
+                  <tr>
+                    <td className="py-2 text-gray-400" colSpan={4}>
+                      A Carregar ...
+                    </td>
+                  </tr>
+                ) : preview_logs.length === 0 ? (
+                  <tr>
+                    <td className="py-2 text-gray-400" colSpan={4}>
+                      Os eventos de auditoria persistidos na BD ainda não estão
+                      expostos nesta vista.
+                    </td>
+                  </tr>
+                ) : (
+                  preview_logs.map((l) => (
+                    <tr
+                      key={l.id}
+                    >
+                      <td className="py-2 text-gray-400">{l.occurred_at}</td>
+                      <td className="py-2 text-gray-400">{l.user_id}</td>
+                      <td className="py-2 text-gray-400">{l.resource_type}</td>
+                      <td className="py-2 text-gray-400">{l.event_type}</td>
+                    </tr>
+                  ))
+                )}
+
               </tbody>
             </table>
           </div>

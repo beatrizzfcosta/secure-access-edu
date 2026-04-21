@@ -21,7 +21,7 @@ export default function Unauthorized() {
           {/* LOGO */}
           <div className="text-center mb-8">
             <span className="font-bold text-3xl text-blue-700 block">
-              Scholar Shield
+              Secure Access Edu
             </span>
             <div className="w-12 h-1 bg-blue-600 mx-auto rounded-full mt-2"></div>
           </div>
@@ -95,7 +95,8 @@ export default function Unauthorized() {
 
       {/* FOOTER */}
       <footer className="bg-gray-100 py-8 text-center text-sm text-gray-500">
-        © 2024 Scholar Shield Academic Systems
+        © 2026 Secure Access Edu
+
       </footer>
 
     </div>

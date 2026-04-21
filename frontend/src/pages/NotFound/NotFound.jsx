@@ -9,7 +9,7 @@ export default function NotFound() {
         <div className="flex items-center gap-2">
           <span className="text-blue-700 text-2xl">🏛️</span>
           <span className="font-bold text-xl text-blue-700">
-            Academic Curator
+            Secure Access Edu
           </span>
         </div>
       </header>
@@ -63,7 +63,7 @@ export default function NotFound() {
 
       {/* FOOTER */}
       <footer className="w-full py-6 bg-gray-100 text-center text-sm text-gray-500">
-        © 2024 Academic Curator
+        © 2026 Secure Access Edu
       </footer>
 
     </div>
