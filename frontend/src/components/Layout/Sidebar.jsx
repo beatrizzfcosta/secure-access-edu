@@ -20,10 +20,27 @@ export default function Sidebar() {
     }
   };
 
-  const isActive = (path) => {
+const isActive = (path) => {
+  
   if (path === "/dashboard") {
-    return location.pathname === "/dashboard" || location.pathname === "/" ||
-      location.pathname === "/admin";
+    const dashboardRoutes = [
+      "/",
+      "/dashboard",
+      "/admin",
+      "/admin/dashboard",
+      "/student",
+      "/student/dashboard",
+      "/professor",
+      "/professor/dashboard",
+    ];
+
+  
+    return (
+      dashboardRoutes.includes(location.pathname) ||
+      !location.pathname.includes("/tasks") &&
+      !location.pathname.includes("/profile") &&
+      !location.pathname.includes("/users")
+    );
   }
 
   return location.pathname === path;
