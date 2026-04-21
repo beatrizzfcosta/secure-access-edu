@@ -127,8 +127,8 @@ def _fetch_user_by_id(dsn: str, user_id: str) -> dict | None:
                            u.created_by IS NOT NULL
                            AND NOT EXISTS (
                                SELECT 1 FROM password_history ph WHERE ph.user_id = u.id
-                           ) AS password_change_required
-                       ),
+                           )
+                       ) AS password_change_required,
                        COALESCE(m.totp_enabled, FALSE),
                        m.totp_secret_encrypted
                 FROM users u
@@ -243,6 +243,31 @@ def set_user_totp_enabled(user_id, enabled: bool) -> None:
     user = get_user_by_id(user_id)
     if user:
         user["otp_enabled"] = enabled
+
+
+def cancel_pending_totp_enrollment(user_id: str) -> None:
+    """Remove segredo TOTP guardado antes do enrollment (totp_enabled ainda falso)."""
+    dsn = _dsn()
+    if dsn:
+        try:
+            uid = uuid.UUID(str(user_id))
+        except ValueError:
+            return
+        with get_connection(dsn) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    DELETE FROM user_mfa_settings
+                    WHERE user_id = %s AND totp_enabled = FALSE
+                    """,
+                    (uid,),
+                )
+        return
+    for user in _USERS_FALLBACK:
+        if str(user["id"]) == str(user_id):
+            if not user.get("otp_enabled"):
+                user["otp_secret"] = None
+            break
 
 
 def register_user_fallback(username: str, password_hash: str) -> None:

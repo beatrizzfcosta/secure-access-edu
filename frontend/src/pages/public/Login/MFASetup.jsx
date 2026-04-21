@@ -1,6 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { get2faSetup, verify2faEnrollment } from "../../../services/authService";
+import {
+  get2faSetup,
+  verify2faEnrollment,
+  cancel2faSetup,
+} from "../../../services/authService";
 import { pathForRole } from "../../../utils/roles";
 import { useAuth } from "../../../hooks/useAuth";
 
@@ -9,6 +13,8 @@ export default function MFASetup() {
   const [loading, setLoading] = useState(false);
   const [setupLoading, setSetupLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [cancelError, setCancelError] = useState("");
+  const [cancelLoading, setCancelLoading] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState("");
 
   const navigate = useNavigate();
@@ -52,6 +58,21 @@ export default function MFASetup() {
       setError(true);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    setCancelError("");
+    setCancelLoading(true);
+    try {
+      await cancel2faSetup();
+      navigate(user?.role ? pathForRole(user.role) : "/dashboard");
+    } catch {
+      setCancelError(
+        "Não foi possível limpar a configuração. Tente novamente."
+      );
+    } finally {
+      setCancelLoading(false);
     }
   };
 
@@ -116,21 +137,25 @@ export default function MFASetup() {
             </div>
           )}
 
+          {cancelError && (
+            <div className="text-red-600 text-sm mb-4">{cancelError}</div>
+          )}
+
           <button
             onClick={handleSubmit}
-            disabled={loading || setupLoading}
+            disabled={loading || setupLoading || cancelLoading}
             className="w-full bg-blue-600 text-white py-3 rounded"
           >
             {loading ? "A validar..." : "Ativar MFA"}
           </button>
 
           <button
-            onClick={() =>
-              navigate(user?.role ? pathForRole(user.role) : "/dashboard")
-            }
-            className="mt-4 text-sm text-blue-600"
+            type="button"
+            onClick={handleCancel}
+            disabled={cancelLoading || loading}
+            className="mt-4 text-sm text-blue-600 disabled:opacity-50"
           >
-            Cancelar
+            {cancelLoading ? "A cancelar…" : "Cancelar"}
           </button>
         </div>
       </main>

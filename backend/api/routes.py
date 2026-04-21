@@ -27,6 +27,7 @@ from app.data.users import (
     change_user_password,
     ensure_totp_secret,
     set_user_totp_enabled,
+    cancel_pending_totp_enrollment,
     register_user_fallback,
     create_user_with_student_role,
 )
@@ -439,9 +440,22 @@ def setup_2fa():
     qr.save(buffer, format="PNG")
 
     qr_base64 = base64.b64encode(buffer.getvalue()).decode()
-    
 
     return {"qr": qr_base64}
+
+
+@api.route("/2fa/setup", methods=["DELETE"])
+@require_auth
+def cancel_2fa_setup():
+    """Apaga segredo pendente se o utilizador cancelar o enrollment (não altera contas com 2FA já ativo)."""
+    user = get_user_by_id(request.user["user_id"])
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    if user.get("otp_enabled"):
+        return jsonify({"message": "ok"})
+    cancel_pending_totp_enrollment(user["id"])
+    return jsonify({"message": "ok"})
+
 
 def _normalize_totp_code(raw) -> str | None:
     if raw is None:

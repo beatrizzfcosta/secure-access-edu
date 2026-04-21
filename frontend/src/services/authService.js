@@ -45,6 +45,11 @@ export function get2faSetup() {
   return api.get("/2fa/setup");
 }
 
+/** Remove segredo TOTP pendente se o utilizador cancelar antes de confirmar o código. */
+export function cancel2faSetup() {
+  return api.delete("/2fa/setup");
+}
+
 export function verify2faEnrollment(otp) {
   return api.post("/2fa/verify", { otp });
 }

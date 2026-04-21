@@ -108,6 +108,7 @@ def require_auth(f):
                     "api.change_password",
                     "api.logout",
                     "api.me",
+                    "api.cancel_2fa_setup",
                     # Tarefas: permitir uso da app com token válido até mudar password
                     "api.get_tasks",
                     "api.list_task_assignable_users",
