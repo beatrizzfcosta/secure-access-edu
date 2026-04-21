@@ -24,6 +24,7 @@ import NotFound from "../pages/NotFound/NotFound";
 
 import AuthGuard from "../guards/AuthGuard";
 import RoleGuard from "../guards/RoleGuard";
+import PasswordChangeBanner from "../components/PasswordChangeBanner/PasswordChangeBanner";
 
 import { ROLES } from "../utils/roles";
 
@@ -32,6 +33,7 @@ const TEACHER_OR_ADMIN = [ROLES.PROFESSOR, ROLES.ADMIN];
 export default function AppRoutes() {
   return (
     <BrowserRouter>
+      <PasswordChangeBanner />
       <Routes>
 
 

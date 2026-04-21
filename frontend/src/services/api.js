@@ -14,4 +14,16 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error.response?.status;
+    const code = error.response?.data?.error;
+    if (status === 403 && code === "PASSWORD_CHANGE_REQUIRED") {
+      window.dispatchEvent(new CustomEvent("secureacad:password-change-required"));
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default api;

@@ -38,7 +38,7 @@ export default function Login() {
     }
   }, [step]);
 
-  const finishLogin = async (token, profileFromLogin) => {
+  const finishLogin = async (token, profileFromLogin, passwordChangeRequired) => {
     if (!token) {
       throw new Error("MISSING_TOKEN");
     }
@@ -52,7 +52,11 @@ export default function Login() {
         throw new Error("PROFILE_LOAD_FAILED");
       }
     }
-    const user = normalizeUser(profile);
+    const user = normalizeUser({
+      ...profile,
+      password_change_required:
+        passwordChangeRequired ?? profile?.password_change_required,
+    });
     loginUser(user);
     navigate(pathForRole(user.role));
   };
@@ -64,7 +68,11 @@ export default function Login() {
 
     try {
       const res = await login({ username, password });
-      await finishLogin(res.data.token, res.data.user);
+      await finishLogin(
+        res.data.token,
+        res.data.user,
+        res.data.password_change_required
+      );
     } catch (err) {
       if (err.message === "MISSING_TOKEN") {
         setError("Resposta do servidor sem token. Tenta outra vez.");
@@ -105,7 +113,11 @@ export default function Login() {
 
     try {
       const res = await login({ username, password, otp: code });
-      await finishLogin(res.data.token, res.data.user);
+      await finishLogin(
+        res.data.token,
+        res.data.user,
+        res.data.password_change_required
+      );
     } catch (err) {
       if (err.message === "MISSING_TOKEN") {
         setError("Resposta do servidor sem token.");

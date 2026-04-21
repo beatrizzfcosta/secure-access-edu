@@ -31,13 +31,21 @@ export function AuthProvider({ children }) {
 
   const loginUser = (userData) => setUser(normalizeUser(userData));
 
+  const refreshUser = async () => {
+    const res = await getMe();
+    setUser(normalizeUser(res.data));
+    return normalizeUser(res.data);
+  };
+
   const logoutUser = () => {
     clearAccessToken();
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loginUser, logoutUser, loading }}>
+    <AuthContext.Provider
+      value={{ user, loginUser, logoutUser, loading, refreshUser }}
+    >
       {children}
     </AuthContext.Provider>
   );

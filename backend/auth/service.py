@@ -108,6 +108,15 @@ def require_auth(f):
                     "api.change_password",
                     "api.logout",
                     "api.me",
+                    # Tarefas: permitir uso da app com token válido até mudar password
+                    "api.get_tasks",
+                    "api.list_task_assignable_users",
+                    "api.get_task",
+                    "api.create_task",
+                    "api.update_task",
+                    "api.delete_task",
+                    "api.create_task_assignment",
+                    "api.delete_task_assignment",
                 }
                 if request.endpoint not in allowed_endpoints:
                     return jsonify({"error": "PASSWORD_CHANGE_REQUIRED"}), 403

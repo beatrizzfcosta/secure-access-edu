@@ -15,12 +15,13 @@ export function clearAccessToken() {
   localStorage.removeItem(TOKEN_KEY);
 }
 
-/** Normaliza payload de /me (user_id → id para a UI) */
+/** Normaliza payload de /me ou login (user_id → id para a UI) */
 export function normalizeUser(data) {
   if (!data) return null;
   return {
     ...data,
     id: data.user_id ?? data.id,
+    password_change_required: Boolean(data.password_change_required),
   };
 }
 
@@ -46,4 +47,8 @@ export function get2faSetup() {
 
 export function verify2faEnrollment(otp) {
   return api.post("/2fa/verify", { otp });
+}
+
+export function changePassword({ old_password, new_password }) {
+  return api.post("/password/change", { old_password, new_password });
 }

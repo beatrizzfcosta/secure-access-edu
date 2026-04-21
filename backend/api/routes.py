@@ -34,11 +34,15 @@ from psycopg.errors import UniqueViolation, ForeignKeyViolation
 from app.data.tasks import (
     get_tasks_for_user,
     create_task as create_task_db,
+    create_task_with_assignees,
     get_task_for_user,
     update_task as update_task_db,
     delete_task as delete_task_db,
     assign_task as assign_task_db,
     unassign_task as unassign_task_db,
+    get_assignees_for_tasks,
+    list_assignable_users,
+    set_task_assignees,
 )
 from app.data.admin import (
     list_users_with_roles,
@@ -224,10 +228,21 @@ def logout():
         revoke_session(dsn, session_id=str(sid))
     return jsonify({"message": "Logged out"}), 200
 
+def _session_public_for_tasks(user: dict) -> dict:
+    """Evita devolver o JWT completo (claims como `exp` podem não ser JSON-serializáveis)."""
+    uid = user.get("user_id")
+    uname = user.get("username")
+    role = user.get("role")
+    return {
+        "user_id": str(uid) if uid is not None else "",
+        "username": str(uname) if uname is not None else None,
+        "role": str(role) if role is not None else None,
+    }
+
+
 @api.route("/tasks", methods=["GET"])
 @require_auth
 @require_roles("student", "teacher", "admin")
-@require_permissions("task.read")
 def get_tasks():
     user = request.user
     dsn = current_app.config.get("DATABASE_URL")
@@ -245,21 +260,62 @@ def get_tasks():
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
+    role = str(user["role"])
+    if role == "student":
+        tasks_out = [
+            {
+                "id": t["id"],
+                "title": t["title"],
+                "description": t["description"],
+            }
+            for t in tasks
+        ]
+    else:
+        amap = get_assignees_for_tasks(dsn, [t["id"] for t in tasks])
+        tasks_out = [{**t, "assignees": amap.get(t["id"], [])} for t in tasks]
+
     return jsonify({
         "msg": "tasks fetched",
-        "user": user,
-        "tasks": tasks
+        "user": _session_public_for_tasks(user),
+        "tasks": tasks_out
     })
 
 
-def _validate_task_payload(data, *, partial: bool = False):
+def _parse_assignee_user_ids(data) -> list[str] | None:
+    if not isinstance(data, dict) or "assignee_user_ids" not in data:
+        return None
+    raw = data.get("assignee_user_ids")
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise ValueError("assignee_user_ids_invalid")
+    out: list[str] = []
+    for x in raw:
+        s = str(x).strip()
+        if s:
+            out.append(s)
+    return out
+
+
+def _prepare_task_detail(dsn: str, task: dict, role: str) -> dict:
+    if role == "student":
+        return {
+            "id": task["id"],
+            "title": task["title"],
+            "description": task["description"],
+        }
+    amap = get_assignees_for_tasks(dsn, [task["id"]])
+    return {**task, "assignees": amap.get(task["id"], [])}
+
+
+def _validate_task_payload(data, *, partial: bool = False, assignees_requested: bool = False):
     if not isinstance(data, dict):
         raise ValueError("invalid_json")
 
     has_title = "title" in data
     has_description = "description" in data
 
-    if partial and not has_title and not has_description:
+    if partial and not has_title and not has_description and not assignees_requested:
         raise ValueError("no_fields_to_update")
 
     if not partial and not has_title:
@@ -296,7 +352,6 @@ def _validate_task_payload(data, *, partial: bool = False):
 @api.route("/tasks", methods=["POST"])
 @require_auth
 @require_roles("teacher", "admin")
-@require_permissions("task.create")
 def create_task():
     dsn = current_app.config.get("DATABASE_URL")
     if not dsn:
@@ -310,19 +365,54 @@ def create_task():
 
     audit_log("CREATE_TASK_ATTEMPT", request.user["user_id"], payload)
     try:
-        task = create_task_db(
-            dsn,
-            title=payload["title"],
-            description=payload.get("description"),
-            created_by=str(request.user["user_id"]),
-        )
+        assignees = _parse_assignee_user_ids(data)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
+
+    try:
+        if assignees is None:
+            task = create_task_db(
+                dsn,
+                title=payload["title"],
+                description=payload.get("description"),
+                created_by=str(request.user["user_id"]),
+            )
+        else:
+            task = create_task_with_assignees(
+                dsn,
+                title=payload["title"],
+                description=payload.get("description"),
+                created_by=str(request.user["user_id"]),
+                assignee_user_ids=assignees,
+                requester_role=str(request.user["role"]),
+            )
+    except ValueError as exc:
+        code = str(exc)
+        if code in ("assignee_not_found", "assignee_must_be_student", "invalid_assignee_user_id"):
+            return jsonify({"error": code}), 400
+        return jsonify({"error": code}), 400
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
     audit_log("CREATE_TASK", request.user["user_id"], task)
-    return jsonify(task), 201
+    role = str(request.user["role"])
+    return jsonify(_prepare_task_detail(dsn, task, role)), 201
+
+
+@api.route("/tasks/assignable-users", methods=["GET"])
+@require_auth
+@require_roles("teacher", "admin")
+def list_task_assignable_users():
+    dsn = current_app.config.get("DATABASE_URL")
+    if not dsn:
+        return jsonify({"error": "Gestão de tarefas requer base de dados"}), 503
+
+    try:
+        users = list_assignable_users(dsn, requester_role=str(request.user["role"]))
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+    return jsonify({"users": users})
 
 
 @api.route("/2fa/setup", methods=["GET"])
@@ -677,7 +767,6 @@ def register():
 @api.route("/tasks/<uuid:task_id>", methods=["GET"])
 @require_auth
 @require_roles("student", "teacher", "admin")
-@require_permissions("task.read")
 def get_task(task_id):
     dsn = current_app.config.get("DATABASE_URL")
     if not dsn:
@@ -693,21 +782,31 @@ def get_task(task_id):
     if not task:
         return {"error": "Task not found or access denied"}, 404
 
-    return jsonify(task)
+    return jsonify(_prepare_task_detail(dsn, task, str(request.user["role"])))
 
 
 @api.route("/tasks/<uuid:task_id>", methods=["PUT"])
 @require_auth
 @require_roles("teacher", "admin")
-@require_permissions("task.update")
 def update_task(task_id):
     dsn = current_app.config.get("DATABASE_URL")
     if not dsn:
         return jsonify({"error": "Gestão de tarefas requer base de dados"}), 503
 
     data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "invalid_json"}), 400
+
+    assignees_requested = "assignee_user_ids" in data
     try:
-        payload = _validate_task_payload(data, partial=True)
+        assignees = _parse_assignee_user_ids(data) if assignees_requested else None
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    try:
+        payload = _validate_task_payload(
+            data, partial=True, assignees_requested=assignees_requested
+        )
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
@@ -720,8 +819,8 @@ def update_task(task_id):
             title=payload.get("title"),
             description=payload.get("description"),
         )
-    except PermissionError:
-        return jsonify({"error": "Forbidden"}), 403
+    except PermissionError as exc:
+        return jsonify({"error": str(exc) or "Forbidden"}), 403
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     except Exception as exc:
@@ -730,14 +829,33 @@ def update_task(task_id):
     if not task:
         return {"error": "Task not found"}, 404
 
+    if assignees is not None:
+        try:
+            set_task_assignees(
+                dsn,
+                task_id=str(task_id),
+                requester_id=str(request.user["user_id"]),
+                requester_role=str(request.user["role"]),
+                assignee_user_ids=assignees,
+            )
+        except PermissionError as exc:
+            return jsonify({"error": str(exc) or "Forbidden"}), 403
+        except ValueError as exc:
+            code = str(exc)
+            if code == "task_not_found":
+                return jsonify({"error": code}), 404
+            return jsonify({"error": code}), 400
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 500
+
     audit_log("UPDATE_TASK", request.user["user_id"], {"task_id": str(task_id)})
-    return jsonify(task)
+    role = str(request.user["role"])
+    return jsonify(_prepare_task_detail(dsn, task, role))
 
 
 @api.route("/tasks/<uuid:task_id>", methods=["DELETE"])
 @require_auth
 @require_roles("teacher", "admin")
-@require_permissions("task.delete")
 def delete_task(task_id):
     dsn = current_app.config.get("DATABASE_URL")
     if not dsn:
@@ -750,8 +868,8 @@ def delete_task(task_id):
             requester_id=str(request.user["user_id"]),
             requester_role=str(request.user["role"]),
         )
-    except PermissionError:
-        return jsonify({"error": "Forbidden"}), 403
+    except PermissionError as exc:
+        return jsonify({"error": str(exc) or "Forbidden"}), 403
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     except Exception as exc:
@@ -767,7 +885,6 @@ def delete_task(task_id):
 @api.route("/tasks/<uuid:task_id>/assignments", methods=["POST"])
 @require_auth
 @require_roles("teacher", "admin")
-@require_permissions("task.assign")
 def create_task_assignment(task_id):
     dsn = current_app.config.get("DATABASE_URL")
     if not dsn:
@@ -789,12 +906,14 @@ def create_task_assignment(task_id):
             assigned_by_user_id=str(request.user["user_id"]),
             requester_role=str(request.user["role"]),
         )
-    except PermissionError:
-        return jsonify({"error": "Forbidden"}), 403
+    except PermissionError as exc:
+        return jsonify({"error": str(exc) or "Forbidden"}), 403
     except ValueError as exc:
         code = str(exc)
         if code in ("task_not_found", "assignee_not_found"):
             return jsonify({"error": code}), 404
+        if code == "assignee_must_be_student":
+            return jsonify({"error": code}), 400
         return jsonify({"error": code}), 400
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
@@ -806,7 +925,6 @@ def create_task_assignment(task_id):
 @api.route("/tasks/<uuid:task_id>/assignments/<uuid:assignee_user_id>", methods=["DELETE"])
 @require_auth
 @require_roles("teacher", "admin")
-@require_permissions("task.assign")
 def delete_task_assignment(task_id, assignee_user_id):
     dsn = current_app.config.get("DATABASE_URL")
     if not dsn:
@@ -820,8 +938,8 @@ def delete_task_assignment(task_id, assignee_user_id):
             requester_id=str(request.user["user_id"]),
             requester_role=str(request.user["role"]),
         )
-    except PermissionError:
-        return jsonify({"error": "Forbidden"}), 403
+    except PermissionError as exc:
+        return jsonify({"error": str(exc) or "Forbidden"}), 403
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
     except Exception as exc:
