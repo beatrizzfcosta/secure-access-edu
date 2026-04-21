@@ -43,12 +43,6 @@ export default function Sidebar() {
           {user?.role === ROLES.ADMIN && (
             <>
               <button
-                onClick={() => navigate("/admin/")}
-                className="block w-full text-left p-2 hover:bg-white rounded"
-              >
-                Admin
-              </button>
-              <button
                 onClick={() => navigate("/admin/users")}
                 className="block w-full text-left p-2 hover:bg-white rounded"
               >
@@ -58,11 +52,11 @@ export default function Sidebar() {
           )}
 
           <button onClick={() => handleNewRequest()} className="block w-full text-left p-2 hover:bg-white rounded">
-            Tasks
+            Tarefas
           </button>
 
           <button onClick={() => navigate("/profile")} className="block w-full text-left p-2 hover:bg-white rounded">
-            Profile
+            Perfil
           </button>
         </nav>
       </div>
@@ -73,7 +67,7 @@ export default function Sidebar() {
           onClick={handleNewRequest}
           className="w-full bg-blue-600 text-white py-2 rounded"
         >
-          New Request
+          Criar Tarefa
         </button>
 
         <button

@@ -49,33 +49,29 @@ export default function AdminDashboard() {
         <h2 className="text-3xl font-bold mb-2">
           System <span className="text-blue-600">Overview</span>
         </h2>
-        <p className="text-gray-500">
-          Monitor system integrity, manage users and audit activity.
-        </p>
+        <p className="text-gray-500 mb-4">
+        Na dashboard de administração, pode monitorizar a integridade do sistema, gerir utilizadores e auditar a atividade do sistema. 
+      </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-xl shadow-sm">
-          <p className="text-xs text-gray-500">Active Users</p>
+          <p className="text-xs text-gray-500">Utilizadores Ativos</p>
           <p className="text-2xl font-bold" id="activeUsers">
             {loading ? "…" : activeUsers}
           </p>
         </div>
 
         <div className="bg-white p-6 rounded-xl shadow-sm">
-          <p className="text-xs text-gray-500">Roles</p>
+          <p className="text-xs text-gray-500">Cargos</p>
           <p className="text-2xl font-bold">{loading ? "…" : roleCount}</p>
         </div>
 
         <div className="bg-white p-6 rounded-xl shadow-sm">
-          <p className="text-xs text-gray-500">Total users</p>
+          <p className="text-xs text-gray-500">Número total de Utilizadores</p>
           <p className="text-2xl font-bold">{loading ? "…" : users.length}</p>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm">
-          <p className="text-xs text-gray-500">Alerts</p>
-          <p className="text-2xl font-bold text-gray-400">—</p>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 space-y-6 md:space-y-0 mt-6">
@@ -158,9 +154,6 @@ export default function AdminDashboard() {
         <div className="md:col-span-12 bg-white rounded-xl p-6 shadow-sm">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-xl font-bold">Auditoria</h3>
-            <button type="button" className="text-sm text-gray-600">
-              Filtrar
-            </button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

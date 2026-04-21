@@ -50,7 +50,7 @@ export default function ManageTasks() {
   return (
     <DashboardLayout>
       <div className="max-w-3xl space-y-6">
-        <h2 className="text-xl font-bold">Gerir tarefas</h2>
+        <h2 className="text-xl font-bold">Criar Tarefa</h2>
         {error && (
           <div className="text-red-600 text-sm bg-red-50 p-3 rounded">{error}</div>
         )}
@@ -84,7 +84,7 @@ export default function ManageTasks() {
           {loading ? (
             <p className="p-4 text-gray-500 text-sm">A carregar…</p>
           ) : tasks.length === 0 ? (
-            <p className="p-4 text-gray-500 text-sm">Nenhuma tarefa.</p>
+            <p className="p-4 text-gray-500 text-sm">Ainda não foi criada nenhuma tarefa.</p>
           ) : (
             tasks.map((t) => (
               <div key={t.id} className="p-4 text-sm">
