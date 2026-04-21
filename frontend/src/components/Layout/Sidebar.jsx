@@ -113,12 +113,14 @@ const isActive = (path) => {
 
       {/* FOOTER */}
       <div className="space-y-2">
-        <button
-          onClick={handleNewRequest}
-          className="w-full bg-blue-600 text-white py-2 rounded"
-        >
-          Criar Tarefa
-        </button>
+        {user?.role !== ROLES.STUDENT && (
+    <button
+      onClick={handleNewRequest}
+      className="w-full bg-blue-600 text-white py-2 rounded"
+    >
+      Criar Tarefa
+    </button>
+  )}
 
         <button
           onClick={handleLogout}
