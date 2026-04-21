@@ -51,10 +51,10 @@ export default function ProfessorDashboard() {
         <div className="relative overflow-hidden rounded-3xl bg-blue-600 p-12 text-white min-h-[240px] flex flex-col justify-end">
           <div className="relative z-10">
             <h3 className="text-4xl font-extrabold mb-2">
-              Welcome back, Professor.
+              Painel do utilizador
             </h3>
             <p className="text-lg opacity-80 max-w-xl">
-              Manage tasks and academic workflow from your dashboard.
+              Gerir tarefas e o fluxo académico a partir do seu painel de controlo.
             </p>
           </div>
         </div>

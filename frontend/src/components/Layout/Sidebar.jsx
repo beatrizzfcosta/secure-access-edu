@@ -1,9 +1,10 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { ROLES } from "../../utils/roles";
 
 export default function Sidebar() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logoutUser } = useAuth();
 
   const handleLogout = () => {
@@ -18,6 +19,15 @@ export default function Sidebar() {
       navigate("/student/tasks");
     }
   };
+
+  const isActive = (path) => {
+  if (path === "/dashboard") {
+    return location.pathname === "/dashboard" || location.pathname === "/" ||
+      location.pathname === "/admin";
+  }
+
+  return location.pathname === path;
+};
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-gray-100 p-6 flex flex-col justify-between">
@@ -36,26 +46,49 @@ export default function Sidebar() {
 
         {/* NAV */}
         <nav className="space-y-2">
-          <button onClick={() => navigate("/dashboard")} className="block w-full text-left p-2 rounded bg-white text-blue-600">
+          <button
+            onClick={() => navigate("/dashboard")}
+            className={`block w-full text-left p-2 rounded ${
+              isActive("/dashboard")
+                ? "bg-white text-blue-600"
+                : "hover:bg-white"
+            }`}
+          >
             Dashboard
           </button>
 
           {user?.role === ROLES.ADMIN && (
-            <>
-              <button
-                onClick={() => navigate("/admin/users")}
-                className="block w-full text-left p-2 hover:bg-white rounded"
-              >
-                Utilizadores
-              </button>
-            </>
+            <button
+              onClick={() => navigate("/admin/users")}
+              className={`block w-full text-left p-2 rounded ${
+                isActive("/admin/users")
+                  ? "bg-white text-blue-600"
+                  : "hover:bg-white"
+              }`}
+            >
+              Utilizadores
+            </button>
           )}
 
-          <button onClick={() => handleNewRequest()} className="block w-full text-left p-2 hover:bg-white rounded">
+          <button
+            onClick={handleNewRequest}
+            className={`block w-full text-left p-2 rounded ${
+              isActive("/professor/tasks") || isActive("/student/tasks")
+                ? "bg-white text-blue-600"
+                : "hover:bg-white"
+            }`}
+          >
             Tarefas
           </button>
 
-          <button onClick={() => navigate("/profile")} className="block w-full text-left p-2 hover:bg-white rounded">
+          <button
+            onClick={() => navigate("/profile")}
+            className={`block w-full text-left p-2 rounded ${
+              isActive("/profile")
+                ? "bg-white text-blue-600"
+                : "hover:bg-white"
+            }`}
+          >
             Perfil
           </button>
         </nav>

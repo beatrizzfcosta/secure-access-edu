@@ -31,9 +31,9 @@ export default function StudentDashboard() {
     <DashboardLayout>
       <div className="space-y-8">
         <div>
-          <h3 className="text-3xl font-bold mb-2">Welcome back, Student</h3>
+          <h3 className="text-3xl font-bold mb-2">Painel do utilizador</h3>
           <p className="text-gray-500">
-            Your academic tasks and progress overview
+            As suas tarefas académicas e visão geral do progresso.
           </p>
         </div>
 
@@ -77,19 +77,13 @@ export default function StudentDashboard() {
               </div>
             </div>
 
-            <div className="bg-blue-600 text-white p-4 rounded">
-              <p className="font-bold">Upgrade Curriculum</p>
-              <p className="text-sm opacity-80">
-                Get AI feedback on your work
-              </p>
-            </div>
+        
           </div>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid md:grid-cols-2 gap-4">
           <StatCard title="Tarefas (API)" value={loading ? "…" : String(total)} />
           <StatCard title="Itens visíveis" value={loading ? "…" : String(preview.length)} />
-          <StatCard title="Créditos" value="—" />
         </div>
       </div>
     </DashboardLayout>
