@@ -26,10 +26,13 @@ services:
       - .env
     # Se DATABASE_URL existir no .env (ex.: Supabase), usa-se; senão Postgres local.
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}}
+      - TZ=Europe/Lisbon
+      - DATABASE_URL=${DATABASE_URL:-postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}}
     ports:
       # 5000 costuma estar ocupado no macOS (ex.: AirPlay); host usa 5001 por defeito.
       - "${API_PORT:-5001}:5000"
+    volumes:
+      - ./backend/logs:/app/logs
     depends_on:
       postgres:
         condition: service_healthy
