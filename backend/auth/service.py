@@ -40,6 +40,7 @@ def generate_access_token(user, *, session_id: str | None = None):
         "user_id": user["id"],
         "username": user["username"],
         "role": user["role"],
+        "password_change_required": bool(user.get("password_change_required", False)),
         "type": "access",
         "exp": datetime.now(timezone.utc) + timedelta(minutes=15)
     }
@@ -101,6 +102,15 @@ def require_auth(f):
                     inactivity_timeout_minutes=inactivity_timeout,
                 ):
                     return jsonify({"error": "Session expired or inactive"}), 401
+
+            if data.get("password_change_required"):
+                allowed_endpoints = {
+                    "api.change_password",
+                    "api.logout",
+                    "api.me",
+                }
+                if request.endpoint not in allowed_endpoints:
+                    return jsonify({"error": "PASSWORD_CHANGE_REQUIRED"}), 403
 
             request.user = data
             request.environ["DATABASE_URL"] = current_app.config.get("DATABASE_URL")
