@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import uuid
+from datetime import datetime, timezone
 
 from auth.service import hash_password
 
@@ -42,7 +43,16 @@ def _decode_secret(blob: bytes | None) -> str | None:
 
 
 def _row_to_user(cur, row) -> dict | None:
-    uid, uname, pwd_hash, is_blocked, totp_enabled, totp_blob = row
+    (
+        uid,
+        uname,
+        pwd_hash,
+        is_blocked,
+        failed_login_count,
+        locked_until,
+        totp_enabled,
+        totp_blob,
+    ) = row
     if is_blocked:
         return None
 
@@ -62,6 +72,8 @@ def _row_to_user(cur, row) -> dict | None:
         "username": uname,
         "password": pwd_hash,
         "role": role,
+        "failed_login_count": int(failed_login_count or 0),
+        "locked_until": locked_until,
         "otp_enabled": bool(totp_enabled),
         "otp_secret": _decode_secret(totp_blob),
         "source": "database",
@@ -74,6 +86,8 @@ def _fetch_user_by_username(dsn: str, username: str) -> dict | None:
             cur.execute(
                 """
                 SELECT u.id, u.username, u.password_hash, u.is_blocked,
+                      u.failed_login_count,
+                      u.locked_until,
                        COALESCE(m.totp_enabled, FALSE),
                        m.totp_secret_encrypted
                 FROM users u
@@ -99,6 +113,8 @@ def _fetch_user_by_id(dsn: str, user_id: str) -> dict | None:
             cur.execute(
                 """
                 SELECT u.id, u.username, u.password_hash, u.is_blocked,
+                      u.failed_login_count,
+                      u.locked_until,
                        COALESCE(m.totp_enabled, FALSE),
                        m.totp_secret_encrypted
                 FROM users u
@@ -227,3 +243,66 @@ def register_user_fallback(username: str, password_hash: str) -> None:
             "otp_enabled": False,
         }
     )
+
+
+def is_user_temporarily_locked(user: dict | None) -> bool:
+    if not user:
+        return False
+    locked_until = user.get("locked_until")
+    if not locked_until:
+        return False
+    now = datetime.now(timezone.utc)
+    try:
+        return locked_until > now
+    except TypeError:
+        # Defensive fallback for naive timestamps
+        return locked_until.replace(tzinfo=timezone.utc) > now
+
+
+def register_failed_login_attempt(
+    user_id: str,
+    *,
+    max_attempts: int,
+    lock_minutes: int,
+) -> None:
+    dsn = _dsn()
+    if not dsn:
+        return
+
+    uid = uuid.UUID(str(user_id))
+    with get_connection(dsn) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE users
+                SET failed_login_count = failed_login_count + 1,
+                    last_failed_login_at = NOW(),
+                    locked_until = CASE
+                        WHEN failed_login_count + 1 >= %s
+                        THEN NOW() + (%s || ' minutes')::interval
+                        ELSE locked_until
+                    END
+                WHERE id = %s
+                """,
+                (int(max_attempts), int(lock_minutes), uid),
+            )
+
+
+def reset_failed_login_state(user_id: str) -> None:
+    dsn = _dsn()
+    if not dsn:
+        return
+
+    uid = uuid.UUID(str(user_id))
+    with get_connection(dsn) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE users
+                SET failed_login_count = 0,
+                    locked_until = NULL,
+                    last_failed_login_at = NULL
+                WHERE id = %s
+                """,
+                (uid,),
+            )

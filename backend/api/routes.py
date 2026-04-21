@@ -7,24 +7,36 @@ import qrcode
 from auth.service import (
     generate_access_token,
     generate_refresh_token,
+    decode_token,
     authenticate_user,
     hash_password,
     verify_otp,
     login_requires_otp,
 )
 from auth.service import require_auth
-from rbac.service import require_roles
+from rbac.service import require_roles, require_permissions
 
 from app.data.users import (
     get_user_by_username,
     get_user_by_id,
+    is_user_temporarily_locked,
+    register_failed_login_attempt,
+    reset_failed_login_state,
     ensure_totp_secret,
     set_user_totp_enabled,
     register_user_fallback,
     create_user_with_student_role,
 )
 from psycopg.errors import UniqueViolation, ForeignKeyViolation
-from app.data.tasks import get_tasks as get_tasks_data, create_task as create_task_data
+from app.data.tasks import (
+    get_tasks_for_user,
+    create_task as create_task_db,
+    get_task_for_user,
+    update_task as update_task_db,
+    delete_task as delete_task_db,
+    assign_task as assign_task_db,
+    unassign_task as unassign_task_db,
+)
 from app.data.admin import (
     list_users_with_roles,
     list_roles as list_roles_db,
@@ -32,6 +44,8 @@ from app.data.admin import (
     create_user_as_admin,
     delete_user_by_id,
 )
+from app.data.sessions import create_session, revoke_session
+from app.data.audit_logs import create_audit_log, list_audit_logs
 
 from observability.logger import log_info, audit_log, log_security_event
 
@@ -68,11 +82,32 @@ def login():
 
     log_info(request.method, username, f"Login attempt for {username}")
 
-    user = authenticate_user(get_user_by_username(username), password)
+    user = get_user_by_username(username)
+
+    if user and is_user_temporarily_locked(user):
+        audit_log("login_blocked_lockout", user=username)
+        try:
+            create_audit_log("login_blocked_lockout", user_id=str(user.get("id")))
+        except Exception:
+            pass
+        return jsonify({"error": "Account temporarily locked"}), 423
+
+    user = authenticate_user(user, password)
 
     if not user:
+        known_user = get_user_by_username(username)
+        if known_user:
+            register_failed_login_attempt(
+                str(known_user["id"]),
+                max_attempts=int(current_app.config.get("LOGIN_MAX_ATTEMPTS", 5)),
+                lock_minutes=int(current_app.config.get("LOGIN_LOCK_MINUTES", 15)),
+            )
         log_info(request.method, username, f"Login failed for {username}")
         audit_log("login_failed", user=username)
+        try:
+            create_audit_log("login_failed", user_id=str(known_user["id"]) if known_user else None)
+        except Exception:
+            pass
         return jsonify({"error": "Invalid credentials"}), 401
 
     if user.get("otp_enabled") and not user.get("otp_secret"):
@@ -92,14 +127,31 @@ def login():
             audit_log("login_failed_otp", user=username)
             return jsonify({"error": "Invalid OTP"}), 401
 
-    token = generate_access_token(user)
+    reset_failed_login_state(str(user["id"]))
+
+    dsn = current_app.config.get("DATABASE_URL")
+    session_id = None
+    if dsn:
+        session_id = create_session(
+            dsn,
+            user_id=str(user["id"]),
+            ttl_minutes=int(current_app.config.get("SESSION_TTL_MINUTES", 60 * 24 * 7)),
+        )
+
+    token = generate_access_token(user, session_id=session_id)
+    refresh_token = generate_refresh_token(user, session_id=session_id)
 
     log_info(request.method, username, f"Login successful for {username}")
     audit_log("login_success", user=username)
+    try:
+        create_audit_log("login_success", user_id=str(user["id"]))
+    except Exception:
+        pass
 
     return jsonify(
         {
             "token": token,
+            "refresh_token": refresh_token,
             "user": {
                 "user_id": user["id"],
                 "username": user["username"],
@@ -108,12 +160,58 @@ def login():
         }
     ), 200
 
+
+@api.route("/token/refresh", methods=["POST"])
+def refresh_token():
+    data = request.get_json(silent=True) or {}
+    incoming = data.get("refresh_token")
+    if not incoming:
+        return jsonify({"error": "refresh_token required"}), 400
+
+    try:
+        payload = decode_token(str(incoming), expected_type="refresh")
+    except Exception:
+        return jsonify({"error": "Invalid refresh token"}), 401
+
+    user = get_user_by_id(str(payload.get("user_id")))
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    sid = payload.get("sid")
+    token = generate_access_token(user, session_id=str(sid) if sid else None)
+    new_refresh = generate_refresh_token(user, session_id=str(sid) if sid else None)
+    return jsonify({"token": token, "refresh_token": new_refresh}), 200
+
+
+@api.route("/logout", methods=["POST"])
+@require_auth
+def logout():
+    sid = request.user.get("sid")
+    dsn = current_app.config.get("DATABASE_URL")
+    if sid and dsn:
+        revoke_session(dsn, session_id=str(sid))
+    return jsonify({"message": "Logged out"}), 200
+
 @api.route("/tasks", methods=["GET"])
 @require_auth
 @require_roles("student", "teacher", "admin")
+@require_permissions("task.read")
 def get_tasks():
     user = request.user
-    tasks = get_tasks_data()
+    dsn = current_app.config.get("DATABASE_URL")
+    if not dsn:
+        return jsonify({"error": "Gestão de tarefas requer base de dados"}), 503
+
+    try:
+        tasks = get_tasks_for_user(
+            dsn,
+            user_id=str(user["user_id"]),
+            role=str(user["role"]),
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
 
     return jsonify({
         "msg": "tasks fetched",
@@ -121,16 +219,78 @@ def get_tasks():
         "tasks": tasks
     })
 
+
+def _validate_task_payload(data, *, partial: bool = False):
+    if not isinstance(data, dict):
+        raise ValueError("invalid_json")
+
+    has_title = "title" in data
+    has_description = "description" in data
+
+    if partial and not has_title and not has_description:
+        raise ValueError("no_fields_to_update")
+
+    if not partial and not has_title:
+        raise ValueError("title_required")
+
+    out = {}
+
+    if has_title:
+        title = data.get("title")
+        if title is None:
+            raise ValueError("title_required")
+        title = str(title).strip()
+        if not title:
+            raise ValueError("title_required")
+        if len(title) > 500:
+            raise ValueError("title_too_long")
+        out["title"] = title
+
+    if has_description:
+        description = data.get("description")
+        if description is None:
+            out["description"] = None
+        else:
+            description = str(description).strip()
+            if len(description) > 5000:
+                raise ValueError("description_too_long")
+            out["description"] = description or None
+
+    if not partial and "description" not in out:
+        out["description"] = None
+
+    return out
+
 @api.route("/tasks", methods=["POST"])
 @require_auth
 @require_roles("teacher", "admin")
+@require_permissions("task.create")
 def create_task():
-    data = request.json
-    audit_log("CREATE_TASK_ATTEMPT", request.user["user_id"], data)
-    task = create_task_data(data)
+    dsn = current_app.config.get("DATABASE_URL")
+    if not dsn:
+        return jsonify({"error": "Gestão de tarefas requer base de dados"}), 503
 
-    audit_log("CREATE_TASK", request.user["user_id"], data)
-    return jsonify(task)
+    data = request.get_json(silent=True)
+    try:
+        payload = _validate_task_payload(data, partial=False)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    audit_log("CREATE_TASK_ATTEMPT", request.user["user_id"], payload)
+    try:
+        task = create_task_db(
+            dsn,
+            title=payload["title"],
+            description=payload.get("description"),
+            created_by=str(request.user["user_id"]),
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+    audit_log("CREATE_TASK", request.user["user_id"], task)
+    return jsonify(task), 201
 
 
 @api.route("/2fa/setup", methods=["GET"])
@@ -202,6 +362,7 @@ def me():
 @api.route("/admin/users", methods=["GET"])
 @require_auth
 @require_roles("admin")
+@require_permissions("user.update")
 def admin_list_users():
     dsn = current_app.config.get("DATABASE_URL")
     if not dsn:
@@ -216,6 +377,7 @@ def admin_list_users():
 @api.route("/admin/users", methods=["POST"])
 @require_auth
 @require_roles("admin")
+@require_permissions("user.create")
 def admin_create_user():
     dsn = current_app.config.get("DATABASE_URL")
     if not dsn:
@@ -289,9 +451,32 @@ def admin_list_roles():
         return jsonify({"error": str(exc)}), 500
 
 
+@api.route("/admin/logs", methods=["GET"])
+@require_auth
+@require_roles("admin")
+@require_permissions("audit.read")
+def admin_list_logs():
+    try:
+        limit_raw = request.args.get("limit", "100")
+        limit = int(limit_raw)
+    except ValueError:
+        return jsonify({"error": "invalid_limit"}), 400
+
+    event_type = request.args.get("event_type")
+    user_id = request.args.get("user_id")
+
+    try:
+        logs = list_audit_logs(limit=limit, event_type=event_type, user_id=user_id)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+    return jsonify({"logs": logs, "count": len(logs)})
+
+
 @api.route("/admin/users/<uuid:user_id>", methods=["DELETE"])
 @require_auth
 @require_roles("admin")
+@require_permissions("user.update")
 def admin_delete_user(user_id):
     dsn = current_app.config.get("DATABASE_URL")
     if not dsn:
@@ -329,6 +514,7 @@ def admin_delete_user(user_id):
 @api.route("/admin/users/<uuid:user_id>/roles", methods=["PATCH"])
 @require_auth
 @require_roles("admin")
+@require_permissions("user.manage_roles")
 def admin_patch_user_roles(user_id):
     dsn = current_app.config.get("DATABASE_URL")
     if not dsn:
@@ -396,45 +582,165 @@ def register():
     register_user_fallback(username, pwd_hash)
     return jsonify({"message": "User created"}), 201
 
-@api.route("/tasks/<int:task_id>", methods=["GET"])
+@api.route("/tasks/<uuid:task_id>", methods=["GET"])
 @require_auth
+@require_roles("student", "teacher", "admin")
+@require_permissions("task.read")
 def get_task(task_id):
-    task = next((t for t in get_tasks_data() if t["id"] == task_id), None)
+    dsn = current_app.config.get("DATABASE_URL")
+    if not dsn:
+        return jsonify({"error": "Gestão de tarefas requer base de dados"}), 503
+
+    task = get_task_for_user(
+        dsn,
+        task_id=str(task_id),
+        requester_id=str(request.user["user_id"]),
+        requester_role=str(request.user["role"]),
+    )
 
     if not task:
-        return {"error": "Task not found"}, 404
+        return {"error": "Task not found or access denied"}, 404
 
     return jsonify(task)
 
-@api.route("/tasks/<int:task_id>", methods=["PUT"])
+
+@api.route("/tasks/<uuid:task_id>", methods=["PUT"])
 @require_auth
 @require_roles("teacher", "admin")
+@require_permissions("task.update")
 def update_task(task_id):
+    dsn = current_app.config.get("DATABASE_URL")
+    if not dsn:
+        return jsonify({"error": "Gestão de tarefas requer base de dados"}), 503
+
     data = request.get_json(silent=True)
+    try:
+        payload = _validate_task_payload(data, partial=True)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
 
-    if not data:
-        return {"error": "Invalid JSON"}, 400
-
-    tasks = get_tasks_data()
-    task = next((t for t in tasks if t["id"] == task_id), None)
+    try:
+        task = update_task_db(
+            dsn,
+            task_id=str(task_id),
+            requester_id=str(request.user["user_id"]),
+            requester_role=str(request.user["role"]),
+            title=payload.get("title"),
+            description=payload.get("description"),
+        )
+    except PermissionError:
+        return jsonify({"error": "Forbidden"}), 403
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
 
     if not task:
         return {"error": "Task not found"}, 404
 
-    task.update(data)
-
+    audit_log("UPDATE_TASK", request.user["user_id"], {"task_id": str(task_id)})
     return jsonify(task)
 
-@api.route("/tasks/<int:task_id>", methods=["DELETE"])
-@require_auth
-@require_roles("admin")
-def delete_task(task_id):
-    tasks = get_tasks_data()
-    task = next((t for t in tasks if t["id"] == task_id), None)
 
-    if not task:
+@api.route("/tasks/<uuid:task_id>", methods=["DELETE"])
+@require_auth
+@require_roles("teacher", "admin")
+@require_permissions("task.delete")
+def delete_task(task_id):
+    dsn = current_app.config.get("DATABASE_URL")
+    if not dsn:
+        return jsonify({"error": "Gestão de tarefas requer base de dados"}), 503
+
+    try:
+        deleted = delete_task_db(
+            dsn,
+            task_id=str(task_id),
+            requester_id=str(request.user["user_id"]),
+            requester_role=str(request.user["role"]),
+        )
+    except PermissionError:
+        return jsonify({"error": "Forbidden"}), 403
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+    if not deleted:
         return {"error": "Task not found"}, 404
 
-    tasks.remove(task)
+    audit_log("DELETE_TASK", request.user["user_id"], {"task_id": str(task_id)})
+    return {"message": "Task deleted"}, 200
 
-    return {"message": "Task deleted"}
+
+@api.route("/tasks/<uuid:task_id>/assignments", methods=["POST"])
+@require_auth
+@require_roles("teacher", "admin")
+@require_permissions("task.assign")
+def create_task_assignment(task_id):
+    dsn = current_app.config.get("DATABASE_URL")
+    if not dsn:
+        return jsonify({"error": "Gestão de tarefas requer base de dados"}), 503
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "invalid_json"}), 400
+
+    assignee_user_id = data.get("user_id")
+    if not assignee_user_id:
+        return jsonify({"error": "user_id_required"}), 400
+
+    try:
+        assignment = assign_task_db(
+            dsn,
+            task_id=str(task_id),
+            assignee_user_id=str(assignee_user_id),
+            assigned_by_user_id=str(request.user["user_id"]),
+            requester_role=str(request.user["role"]),
+        )
+    except PermissionError:
+        return jsonify({"error": "Forbidden"}), 403
+    except ValueError as exc:
+        code = str(exc)
+        if code in ("task_not_found", "assignee_not_found"):
+            return jsonify({"error": code}), 404
+        return jsonify({"error": code}), 400
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+    audit_log("ASSIGN_TASK", request.user["user_id"], assignment)
+    return jsonify({"assignment": assignment}), 201
+
+
+@api.route("/tasks/<uuid:task_id>/assignments/<uuid:assignee_user_id>", methods=["DELETE"])
+@require_auth
+@require_roles("teacher", "admin")
+@require_permissions("task.assign")
+def delete_task_assignment(task_id, assignee_user_id):
+    dsn = current_app.config.get("DATABASE_URL")
+    if not dsn:
+        return jsonify({"error": "Gestão de tarefas requer base de dados"}), 503
+
+    try:
+        removed = unassign_task_db(
+            dsn,
+            task_id=str(task_id),
+            assignee_user_id=str(assignee_user_id),
+            requester_id=str(request.user["user_id"]),
+            requester_role=str(request.user["role"]),
+        )
+    except PermissionError:
+        return jsonify({"error": "Forbidden"}), 403
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+    if not removed:
+        return jsonify({"error": "assignment_or_task_not_found"}), 404
+
+    audit_log(
+        "UNASSIGN_TASK",
+        request.user["user_id"],
+        {"task_id": str(task_id), "user_id": str(assignee_user_id)},
+    )
+    return jsonify({"message": "Assignment removed"}), 200

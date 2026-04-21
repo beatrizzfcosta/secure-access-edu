@@ -7,6 +7,8 @@ from flask import request, jsonify, current_app
 from functools import wraps
 from argon2 import PasswordHasher
 
+from app.data.sessions import refresh_session_activity
+
 ph = PasswordHasher()
 
 
@@ -31,7 +33,7 @@ def verify_password(password_hash: str, password: str) -> bool:
         return False
 
 
-def generate_access_token(user):
+def generate_access_token(user, *, session_id: str | None = None):
     private_key = current_app.config["JWT_SECRET_KEY"]
 
     payload = {
@@ -42,10 +44,13 @@ def generate_access_token(user):
         "exp": datetime.now(timezone.utc) + timedelta(minutes=15)
     }
 
+    if session_id:
+        payload["sid"] = session_id
+
     return jwt.encode(payload, private_key, algorithm="HS256")
 
 
-def generate_refresh_token(user):
+def generate_refresh_token(user, *, session_id: str | None = None):
     private_key = current_app.config["JWT_SECRET_KEY"]
 
     payload = {
@@ -57,7 +62,18 @@ def generate_refresh_token(user):
         "exp": datetime.now(timezone.utc) + timedelta(days=7)
     }
 
+    if session_id:
+        payload["sid"] = session_id
+
     return jwt.encode(payload, private_key, algorithm="HS256")
+
+
+def decode_token(token: str, *, expected_type: str | None = None) -> dict:
+    private_key = current_app.config["JWT_SECRET_KEY"]
+    data = jwt.decode(token, private_key, algorithms=["HS256"])
+    if expected_type and data.get("type") != expected_type:
+        raise jwt.InvalidTokenError("Invalid token type")
+    return data
 
 
 def require_auth(f):
@@ -73,12 +89,21 @@ def require_auth(f):
             token = token.split(" ")[1]
 
         try:
-            data = jwt.decode(token, private_key, algorithms=["HS256"])
+            data = decode_token(token, expected_type="access")
 
-            if data.get("type") != "access":
-                return jsonify({"error": "Invalid token type"}), 401
+            sid = data.get("sid")
+            dsn = current_app.config.get("DATABASE_URL")
+            if sid and dsn:
+                inactivity_timeout = int(current_app.config.get("SESSION_INACTIVITY_TIMEOUT_MINUTES", 30))
+                if not refresh_session_activity(
+                    dsn,
+                    session_id=str(sid),
+                    inactivity_timeout_minutes=inactivity_timeout,
+                ):
+                    return jsonify({"error": "Session expired or inactive"}), 401
 
             request.user = data
+            request.environ["DATABASE_URL"] = current_app.config.get("DATABASE_URL")
 
         except jwt.ExpiredSignatureError:
             return jsonify({"error": "Token expired"}), 401
@@ -122,6 +147,7 @@ __all__ = [
     "verify_password",
     "generate_access_token",
     "generate_refresh_token",
+    "decode_token",
     "require_auth",
     "verify_otp",
     "login_requires_otp",
