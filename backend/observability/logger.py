@@ -22,7 +22,7 @@ class SecurityFilter(logging.Filter):
 
 # Configuração de Logs
 log_formatter = logging.Formatter('%(levelname)s | %(asctime)s | [IP: %(ip)s] | %(message)s')
-log_file = 'logs/app_security.log'
+log_file = '/app/logs/app_security.log'
 
 file_handler = RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=5, encoding='utf-8')
 file_handler.setFormatter(log_formatter)
