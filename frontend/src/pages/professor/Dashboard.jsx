@@ -47,16 +47,12 @@ export default function ProfessorDashboard() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-12">
-        <div className="relative overflow-hidden rounded-3xl bg-blue-600 p-12 text-white min-h-[240px] flex flex-col justify-end">
-          <div className="relative z-10">
-            <h3 className="text-4xl font-extrabold mb-2">
-              Painel do utilizador
-            </h3>
-            <p className="text-lg opacity-80 max-w-xl">
-              Gerir tarefas e o fluxo académico a partir do seu painel de controlo.
-            </p>
-          </div>
+      <div className="space-y-8">
+        <div>
+          <h3 className="text-3xl font-bold mb-2">Painel do utilizador</h3>
+          <p className="text-gray-500">
+           Gerir tarefas e o fluxo académico a partir do seu painel de controlo.
+          </p>
         </div>
 
         {error && (
