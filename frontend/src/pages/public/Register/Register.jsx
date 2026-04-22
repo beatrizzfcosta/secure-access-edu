@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { registerAccount } from "../../../services/authService";
 import PasswordField from "../../../components/PasswordField/PasswordField";
+import { translatePasswordPolicyCode } from "../../../utils/passwordPolicyMessages";
 
 export default function Register() {
   const [form, setForm] = useState({
@@ -51,9 +52,11 @@ export default function Register() {
       navigate("/login");
     } catch (err) {
       const msg = err.response?.data?.error;
-      setError(
-        typeof msg === "string" ? msg : "Erro ao criar conta. Tente novamente."
-      );
+      if (typeof msg === "string") {
+        setError(translatePasswordPolicyCode(msg) ?? msg);
+      } else {
+        setError("Erro ao criar conta. Tente novamente.");
+      }
     } finally {
       setLoading(false);
     }

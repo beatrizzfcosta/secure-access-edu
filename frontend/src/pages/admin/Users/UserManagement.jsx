@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { translatePasswordPolicyCode } from "../../../utils/passwordPolicyMessages";
 import { useLocation, useNavigate } from "react-router-dom";
 import DashboardLayout from "../../../components/Layout/DashboardLayout";
 import {
@@ -219,7 +220,11 @@ export default function UserManagement() {
       await load();
     } catch (err) {
       const msg = err.response?.data?.error;
-      setError(typeof msg === "string" ? msg : "Não foi possível criar o utilizador.");
+      if (typeof msg === "string") {
+        setError(translatePasswordPolicyCode(msg) ?? msg);
+      } else {
+        setError("Não foi possível criar o utilizador.");
+      }
     } finally {
       setCreating(false);
     }
