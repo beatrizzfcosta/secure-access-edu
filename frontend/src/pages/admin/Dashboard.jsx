@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import DashboardLayout from "../../components/Layout/DashboardLayout";
-import { fetchAdminUsers, fetchAdminRoles, fetchAdminLogs } from "../../services/adminService";
+import { fetchAdminUsers, fetchAdminRoles, fetchAdminLogs, downloadLogsFile } from "../../services/adminService";
 
 
 export default function AdminDashboard() {
@@ -158,6 +158,7 @@ export default function AdminDashboard() {
 
             <button
               type="button"
+              onClick={downloadLogsFile}
               className="flex items-center gap-2 text-blue-600 font-semibold hover:opacity-80"
         >
               <span className="text-lg">⬇</span>
