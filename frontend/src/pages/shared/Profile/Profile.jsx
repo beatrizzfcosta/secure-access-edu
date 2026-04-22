@@ -13,6 +13,75 @@ function policiesStorageKey(userId) {
   return `secureacad_accepted_security_policies:${userId}`;
 }
 
+const PASSWORD_POLICY_MESSAGES_PT = {
+  password_required: "Indique uma palavra-passe.",
+  password_too_short: "A nova palavra-passe é demasiado curta (mín. 8).",
+  password_too_long: "A nova palavra-passe é demasiado longa.",
+  password_requires_uppercase: "É necessária pelo menos uma letra maiúscula.",
+  password_requires_number: "É necessário pelo menos um dígito.",
+  password_requires_special_char:
+    "É necessário pelo menos um carácter especial.",
+  password_compromised: "Esta palavra-passe é demasiado fraca ou comum.",
+  password_reuse_not_allowed: "Não pode reutilizar uma palavra-passe antiga.",
+};
+
+/** Mensagens em inglês devolvidas pelo backend em /password/change */
+const PASSWORD_CHANGE_ENGLISH_PT = {
+  "current password is invalid": "A palavra-passe atual está incorreta.",
+  "invalid json": "JSON inválido.",
+  "old_password and new_password required":
+    "É necessária a palavra-passe atual e a nova palavra-passe.",
+  "user not found": "Utilizador não encontrado.",
+};
+
+function rawStringFromApiErrorData(data) {
+  if (data == null) return null;
+  if (typeof data === "string") return data;
+  if (typeof data !== "object") return null;
+  const { error, message, detail } = data;
+  if (typeof error === "string") return error;
+  if (typeof message === "string") return message;
+  if (typeof detail === "string") return detail;
+  return null;
+}
+
+function messageForPasswordChangeError(err) {
+  let data = err?.response?.data;
+  if (typeof data === "string") {
+    try {
+      data = JSON.parse(data);
+    } catch {
+      return data.trim() || null;
+    }
+  }
+
+  const raw = rawStringFromApiErrorData(data);
+  if (raw == null || typeof raw !== "string") {
+    return null;
+  }
+
+  const msg = raw.trim();
+  if (!msg) return null;
+
+  const lower = msg.toLowerCase();
+  if (PASSWORD_CHANGE_ENGLISH_PT[lower]) {
+    return PASSWORD_CHANGE_ENGLISH_PT[lower];
+  }
+
+  if (PASSWORD_POLICY_MESSAGES_PT[msg]) {
+    return PASSWORD_POLICY_MESSAGES_PT[msg];
+  }
+  if (PASSWORD_POLICY_MESSAGES_PT[lower]) {
+    return PASSWORD_POLICY_MESSAGES_PT[lower];
+  }
+
+  if (/^[a-z0-9_]+$/.test(lower)) {
+    return "Não foi possível alterar a palavra-passe.";
+  }
+
+  return msg;
+}
+
 export default function Profile() {
   const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
@@ -118,26 +187,10 @@ export default function Profile() {
         );
       }
     } catch (err) {
-      const msg = err.response?.data?.error;
-      const policyMap = {
-        password_too_short: "A nova palavra-passe é demasiado curta (mín. 8).",
-        password_too_long: "A nova palavra-passe é demasiado longa.",
-        password_requires_uppercase: "É necessária pelo menos uma letra maiúscula.",
-        password_requires_number: "É necessário pelo menos um dígito.",
-        password_requires_special_char:
-          "É necessário pelo menos um carácter especial.",
-        password_compromised: "Esta palavra-passe é demasiado fraca ou comum.",
-        password_reuse_not_allowed: "Não pode reutilizar uma palavra-passe antiga.",
-      };
-      if (msg === "Current password is invalid") {
-        setPwdError("A palavra-passe atual está incorreta.");
-      } else if (msg && policyMap[msg]) {
-        setPwdError(policyMap[msg]);
-      } else if (typeof msg === "string") {
-        setPwdError(msg);
-      } else {
-        setPwdError("Não foi possível alterar a palavra-passe.");
-      }
+      const translated = messageForPasswordChangeError(err);
+      setPwdError(
+        translated ?? "Não foi possível alterar a palavra-passe."
+      );
     } finally {
       setPwdSaving(false);
     }
