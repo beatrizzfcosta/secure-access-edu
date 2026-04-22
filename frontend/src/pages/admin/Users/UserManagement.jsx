@@ -9,6 +9,7 @@ import {
   deleteAdminUser,
 } from "../../../services/adminService";
 import { useAuth } from "../../../hooks/useAuth";
+import PasswordField from "../../../components/PasswordField/PasswordField";
 
 function IconPencil({ className = "w-4 h-4" }) {
   return (
@@ -308,10 +309,9 @@ export default function UserManagement() {
                 setCreateForm({ ...createForm, email: e.target.value })
               }
             />
-            <input
-              type="password"
+            <PasswordField
               placeholder="Palavra-passe"
-              className="border p-2 rounded w-full"
+              inputClassName="border p-2 rounded w-full"
               value={createForm.password}
               onChange={(e) =>
                 setCreateForm({ ...createForm, password: e.target.value })

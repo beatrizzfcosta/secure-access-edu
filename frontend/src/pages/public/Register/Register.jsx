@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { registerAccount } from "../../../services/authService";
+import PasswordField from "../../../components/PasswordField/PasswordField";
 
 export default function Register() {
   const [form, setForm] = useState({
@@ -93,19 +94,17 @@ export default function Register() {
               required
             />
 
-            <input
-              type="password"
+            <PasswordField
               placeholder="Palavra-passe"
-              className="w-full border p-3 rounded"
+              inputClassName="w-full border p-3 rounded"
               value={form.password}
               onChange={(e) => handleChange("password", e.target.value)}
               required
             />
 
-            <input
-              type="password"
+            <PasswordField
               placeholder="Confirmar palavra-passe"
-              className="w-full border p-3 rounded"
+              inputClassName="w-full border p-3 rounded"
               value={form.confirmPassword}
               onChange={(e) => handleChange("confirmPassword", e.target.value)}
               required

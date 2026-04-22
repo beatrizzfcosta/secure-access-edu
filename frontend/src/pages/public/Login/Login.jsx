@@ -8,6 +8,7 @@ import {
 import { useAuth } from "../../../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { pathForRole } from "../../../utils/roles";
+import PasswordField from "../../../components/PasswordField/PasswordField";
 
 function isOtpRequiredError(err) {
   if (!err?.response || err.response.status !== 401) return false;
@@ -193,10 +194,9 @@ export default function Login() {
                   onChange={(e) => setUsername(e.target.value)}
                 />
 
-                <input
-                  type="password"
+                <PasswordField
                   placeholder="Palavra-passe"
-                  className="w-full border p-2 rounded"
+                  inputClassName="w-full border p-2 rounded"
                   autoComplete="current-password"
                   required
                   value={password}

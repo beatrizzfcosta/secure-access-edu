@@ -751,7 +751,7 @@ def admin_delete_user(user_id):
         return jsonify(
             {
                 "error": "Não é possível eliminar: o utilizador criou ou atribuiu tarefas. "
-                "Apague ou reatribua essas tarefas primeiro (ou use SQL na BD).",
+                "Apague ou reatribua essas tarefas primeiro.",
             }
         ), 409
     except Exception as exc:

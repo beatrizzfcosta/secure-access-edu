@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import DashboardLayout from "../../../components/Layout/DashboardLayout";
 import SecurityPoliciesModal from "../../../components/SecurityPoliciesModal/SecurityPoliciesModal";
+import PasswordField from "../../../components/PasswordField/PasswordField";
 import { useAuth } from "../../../hooks/useAuth";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -193,11 +194,10 @@ export default function Profile() {
               >
                 Palavra-passe atual
               </label>
-              <input
+              <PasswordField
                 id="profile-old-password"
-                type="password"
                 autoComplete="current-password"
-                className="w-full border border-gray-300 p-2 rounded"
+                inputClassName="w-full border border-gray-300 p-2 rounded"
                 value={oldPassword}
                 onChange={(e) => setOldPassword(e.target.value)}
                 required
@@ -215,11 +215,10 @@ export default function Profile() {
               >
                 Nova palavra-passe
               </label>
-              <input
+              <PasswordField
                 id="profile-new-password"
-                type="password"
                 autoComplete="new-password"
-                className="w-full border border-gray-300 p-2 rounded"
+                inputClassName="w-full border border-gray-300 p-2 rounded"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
@@ -234,11 +233,10 @@ export default function Profile() {
               >
                 Confirmar nova palavra-passe
               </label>
-              <input
+              <PasswordField
                 id="profile-confirm-password"
-                type="password"
                 autoComplete="new-password"
-                className="w-full border border-gray-300 p-2 rounded"
+                inputClassName="w-full border border-gray-300 p-2 rounded"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
