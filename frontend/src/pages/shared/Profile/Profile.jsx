@@ -18,6 +18,7 @@ export default function Profile() {
   const location = useLocation();
 
   const [policiesAccepted, setPoliciesAccepted] = useState(true);
+  const [policiesReviewOpen, setPoliciesReviewOpen] = useState(false);
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -52,6 +53,9 @@ export default function Profile() {
 
   const showPoliciesGate =
     Boolean(user?.password_change_required) && !policiesAccepted;
+
+  const policiesModalOpen = showPoliciesGate || policiesReviewOpen;
+  const policiesModalVariant = showPoliciesGate ? "mandatory" : "readonly";
 
   useEffect(() => {
     if (showPoliciesGate) return;
@@ -141,8 +145,10 @@ export default function Profile() {
   return (
     <DashboardLayout>
       <SecurityPoliciesModal
-        open={showPoliciesGate}
+        open={policiesModalOpen}
+        variant={policiesModalVariant}
         onAccept={handleAcceptSecurityPolicies}
+        onClose={() => setPoliciesReviewOpen(false)}
       />
       <div className="max-w-xl space-y-8 w-full">
         <div
@@ -162,6 +168,21 @@ export default function Profile() {
               É <strong>obrigatório</strong> definir uma nova palavra-passe
               nesta conta. Aceite as políticas de segurança no diálogo para
               continuar.
+            </p>
+          )}
+          {!showPoliciesGate && (
+            <p className="text-sm mb-4">
+              <button
+                type="button"
+                onClick={() => setPoliciesReviewOpen(true)}
+                className="text-blue-600 font-medium underline hover:text-blue-800"
+              >
+                Ver políticas de segurança
+              </button>
+              <span className="text-gray-500">
+                {" "}
+                — pode consultar quando precisar.
+              </span>
             </p>
           )}
           <form onSubmit={handlePasswordSubmit} className="space-y-4">
