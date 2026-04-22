@@ -46,17 +46,6 @@ def log_security_event(level, message, user_id="ANONYMOUS"):
     elif level.upper() == "ERROR":
         logger.error(f"X {msg}")
 
-def _show_error_details() -> bool:
-    if os.environ.get("SHOW_ERROR_DETAILS", "").lower() in ("1", "true", "yes"):
-        return True
-    if os.environ.get("FLASK_DEBUG", "true").lower() in ("1", "true", "yes"):
-        return True
-    try:
-        return bool(current_app.debug)
-    except RuntimeError:
-        return False
-
-
 def error_handling(app):
     @app.errorhandler(Exception)
     def handle_exception(e):
@@ -65,11 +54,10 @@ def error_handling(app):
 
         logger.error(f"SYSTEM_ERROR: {str(e)}", exc_info=True)
 
-        if _show_error_details():
-            return jsonify(
-                {"error": str(e), "type": type(e).__name__}
-            ), 500
-
         return jsonify(
-            {"error": "Internal server error. Access denied by default."}
+            {
+                "error": "Internal server error. Access denied by default.",
+                "message": "The incident has been logged and will be reviewed by the security team."
+            }
+            
         ), 500

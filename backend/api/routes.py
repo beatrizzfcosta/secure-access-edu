@@ -1,7 +1,8 @@
 import base64
 import io
+import os
 
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, send_file
 import qrcode
 
 from auth.service import (
@@ -124,7 +125,12 @@ def login():
     if user and is_user_temporarily_locked(user):
         audit_log("login_blocked_lockout", user=username)
         try:
-            create_audit_log("login_blocked_lockout", user_id=str(user.get("id")))
+            create_audit_log(
+                event_type="login_blocked_lockout", 
+                user_id=str(user.get("id")),
+                resource_type="user",
+                resource_id=str(user.get("id"))
+            )
         except Exception:
             pass
         return jsonify({"error": "Account temporarily locked"}), 423
@@ -142,7 +148,12 @@ def login():
         log_info(request.method, username, f"Login failed for {username}")
         audit_log("login_failed", user=username)
         try:
-            create_audit_log("login_failed", user_id=str(known_user["id"]) if known_user else None)
+            create_audit_log(
+                event_type="login_failed", 
+                user_id=str(known_user["id"]) if known_user else None,
+                resource_type="user",
+                resource_id=str(known_user["id"]) if known_user else None
+            )
         except Exception:
             pass
         return jsonify({"error": "Invalid credentials"}), 401
@@ -181,7 +192,12 @@ def login():
     log_info(request.method, username, f"Login successful for {username}")
     audit_log("login_success", user=username)
     try:
-        create_audit_log("login_success", user_id=str(user["id"]))
+        create_audit_log(
+            event_type="login_success", 
+            user_id=str(user["id"]),
+            resource_type="user",
+            resource_id=str(user["id"])
+        )
     except Exception:
         pass
 
@@ -385,8 +401,6 @@ def create_task():
             ),
             429,
         )
-
-    audit_log("CREATE_TASK_ATTEMPT", request.user["user_id"], payload)
     try:
         if assignees is None:
             task = create_task_db(
@@ -412,7 +426,16 @@ def create_task():
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
-    audit_log("CREATE_TASK", request.user["user_id"], task)
+    audit_log("TASK_CREATED", user=str(request.user["user_id"]), details={"task_id": task["id"], "title": task["title"]})
+    try:
+        create_audit_log(
+            event_type="task_created",
+            user_id=str(request.user["user_id"]),
+            resource_type="task",
+            resource_id=str(task["id"])
+        )
+    except Exception:
+        pass
     role = str(request.user["role"])
     return jsonify(_prepare_task_detail(dsn, task, role)), 201
 
@@ -549,6 +572,8 @@ def change_password():
     new_hash = hash_password(str(new_password))
     try:
         change_user_password(user_id, new_password_hash=new_hash, keep_history=5)
+        audit_log("PASSWORD_CHANGED", user=user.get("username"), details={"user_id": user_id})
+        log_info(request.method, user.get("username"), "Password changed successfully")
     except ValueError as exc:
         if str(exc) == "user_not_found":
             return jsonify({"error": "User not found"}), 404
@@ -556,7 +581,7 @@ def change_password():
 
     audit_log("password_changed", user=user.get("username"))
     try:
-        create_audit_log("password_changed", user_id=user_id)
+        create_audit_log("password_changed", user_id=user_id, resource_type="user")
     except Exception:
         pass
 
@@ -637,11 +662,16 @@ def admin_create_user():
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
-    audit_log(
-        "user_created_by_admin",
-        user=str(admin_id),
-        details={"new_user_id": new_id, "username": username, "roles": role_names},
-    )
+    audit_log("USER_CREATED", user=str(admin_id), details={"new_username": username, "assigned_roles": role_names})
+    try:
+        create_audit_log(
+            event_type="user_created",
+            user_id=str(admin_id),
+            resource_type="user",
+            resource_id=str(new_id)
+        )
+    except Exception:
+        pass
     return jsonify({"message": "Utilizador criado", "user_id": new_id}), 201
 
 
@@ -681,6 +711,22 @@ def admin_list_logs():
     return jsonify({"logs": logs, "count": len(logs)})
 
 
+@api.route("/admin/logs/download", methods=["GET"])
+@require_auth
+@require_roles("admin")
+def download_admin_logs():
+    log_file_path = '/app/logs/app_security.log'
+    
+    if os.path.exists(log_file_path):
+        return send_file(
+            log_file_path,
+            mimetype="text/plain",
+            as_attachment=True,
+            download_name="logs.txt"
+        )
+    return jsonify({"error": "Ficheiro de logs nao encontrado"}), 404
+
+
 @api.route("/admin/users/<uuid:user_id>", methods=["DELETE"])
 @require_auth
 @require_roles("admin")
@@ -711,11 +757,16 @@ def admin_delete_user(user_id):
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
-    audit_log(
-        "user_deleted_by_admin",
-        user=str(request.user.get("user_id")),
-        details={"deleted_user_id": str(user_id)},
-    )
+    audit_log("USER_DELETED", user=str(request.user.get("user_id")), details={"deleted_user_id": str(user_id)})
+    try:
+        create_audit_log(
+            event_type="user_deleted", 
+            user_id=str(request.user.get("user_id")),
+            resource_type="user",
+            resource_id=str(user_id)
+        )
+    except Exception:
+        pass
     return jsonify({"message": "Utilizador eliminado"}), 200
 
 
@@ -753,11 +804,19 @@ def admin_patch_user_roles(user_id):
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
-    audit_log(
-        "user_roles_updated",
-        user=str(request.user.get("user_id")),
-        details={"target_user": str(user_id), "roles": role_names},
-    )
+    audit_log("USER_ROLES_CHANGED", user=str(request.user.get("user_id")), details={
+        "target_user_id": str(user_id),
+        "new_roles": role_names
+    })
+    try:
+        create_audit_log(
+            event_type="user_roles_updated", 
+            user_id=str(request.user.get("user_id")),
+            resource_type="user",
+            resource_id=str(user_id)
+        )
+    except Exception:
+        pass
     return jsonify({"message": "Papéis atualizados", "roles": role_names})
 
 
@@ -879,7 +938,16 @@ def update_task(task_id):
         except Exception as exc:
             return jsonify({"error": str(exc)}), 500
 
-    audit_log("UPDATE_TASK", request.user["user_id"], {"task_id": str(task_id)})
+    audit_log("TASK_UPDATED", user=str(request.user["user_id"]), details={"task_id": str(task_id)})
+    try:
+        create_audit_log(
+            event_type="task_updated",
+            user_id=str(request.user["user_id"]),
+            resource_type="task",
+            resource_id=str(task_id)
+        )
+    except Exception:
+        pass
     role = str(request.user["role"])
     return jsonify(_prepare_task_detail(dsn, task, role))
 
@@ -909,7 +977,16 @@ def delete_task(task_id):
     if not deleted:
         return {"error": "Task not found"}, 404
 
-    audit_log("DELETE_TASK", request.user["user_id"], {"task_id": str(task_id)})
+    audit_log("TASK_DELETED", user=str(request.user["user_id"]), details={"task_id": str(task_id)})
+    try:
+        create_audit_log(
+            event_type="task_deleted",
+            user_id=str(request.user["user_id"]),
+            resource_type="task",
+            resource_id=str(task_id)
+        )
+    except Exception:
+        pass
     return {"message": "Task deleted"}, 200
 
 
