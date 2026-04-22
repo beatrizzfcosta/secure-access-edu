@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import DashboardLayout from "../../../components/Layout/DashboardLayout";
+import SecurityPoliciesModal from "../../../components/SecurityPoliciesModal/SecurityPoliciesModal";
 import { useAuth } from "../../../hooks/useAuth";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -7,11 +8,16 @@ import {
   setAccessToken,
 } from "../../../services/authService";
 
+function policiesStorageKey(userId) {
+  return `secureacad_accepted_security_policies:${userId}`;
+}
+
 export default function Profile() {
   const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
+  const [policiesAccepted, setPoliciesAccepted] = useState(true);
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -26,6 +32,29 @@ export default function Profile() {
   };
 
   useEffect(() => {
+    if (!user?.id) return;
+    if (!user.password_change_required) {
+      sessionStorage.removeItem(policiesStorageKey(user.id));
+      setPoliciesAccepted(true);
+      return;
+    }
+    const accepted =
+      sessionStorage.getItem(policiesStorageKey(user.id)) === "1";
+    setPoliciesAccepted(accepted);
+  }, [user?.id, user?.password_change_required]);
+
+  const handleAcceptSecurityPolicies = () => {
+    if (user?.id) {
+      sessionStorage.setItem(policiesStorageKey(user.id), "1");
+    }
+    setPoliciesAccepted(true);
+  };
+
+  const showPoliciesGate =
+    Boolean(user?.password_change_required) && !policiesAccepted;
+
+  useEffect(() => {
+    if (showPoliciesGate) return;
     const focus =
       location.state?.focusPassword || location.hash === "#palavra-passe";
     if (focus) {
@@ -35,7 +64,7 @@ export default function Profile() {
         document.getElementById("profile-old-password")?.focus();
       }, 300);
     }
-  }, [location.state, location.hash]);
+  }, [location.state, location.hash, showPoliciesGate]);
 
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
@@ -111,10 +140,17 @@ export default function Profile() {
 
   return (
     <DashboardLayout>
+      <SecurityPoliciesModal
+        open={showPoliciesGate}
+        onAccept={handleAcceptSecurityPolicies}
+      />
       <div className="max-w-xl space-y-8 w-full">
         <div
           id="secao-palavra-passe"
-          className="bg-white p-6 rounded-xl shadow-sm border-2 border-gray-200"
+          className={`bg-white p-6 rounded-xl shadow-sm border-2 border-gray-200 ${
+            showPoliciesGate ? "pointer-events-none opacity-40 select-none" : ""
+          }`}
+          aria-hidden={showPoliciesGate}
         >
           <h2 className="text-xl font-bold mb-1">Alterar palavra-passe</h2>
           <p className="text-sm text-gray-600 mb-4">
@@ -124,7 +160,8 @@ export default function Profile() {
           {user?.password_change_required && (
             <p className="text-sm text-amber-900 bg-amber-100 border border-amber-300 rounded-lg p-3 mb-4">
               É <strong>obrigatório</strong> definir uma nova palavra-passe
-              nesta conta.
+              nesta conta. Aceite as políticas de segurança no diálogo para
+              continuar.
             </p>
           )}
           <form onSubmit={handlePasswordSubmit} className="space-y-4">
@@ -143,6 +180,7 @@ export default function Profile() {
                 value={oldPassword}
                 onChange={(e) => setOldPassword(e.target.value)}
                 required
+                disabled={showPoliciesGate}
               />
             </div>
             <p className="text-xs text-gray-500">
@@ -165,6 +203,7 @@ export default function Profile() {
                 onChange={(e) => setNewPassword(e.target.value)}
                 required
                 minLength={8}
+                disabled={showPoliciesGate}
               />
             </div>
             <div>
@@ -183,6 +222,7 @@ export default function Profile() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 minLength={8}
+                disabled={showPoliciesGate}
               />
             </div>
             {pwdError && (
@@ -197,7 +237,7 @@ export default function Profile() {
             )}
             <button
               type="submit"
-              disabled={pwdSaving}
+              disabled={pwdSaving || showPoliciesGate}
               className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold disabled:opacity-60"
             >
               {pwdSaving ? "A guardar…" : "Guardar nova palavra-passe"}
@@ -205,7 +245,12 @@ export default function Profile() {
           </form>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm">
+        <div
+          className={`bg-white p-6 rounded-xl shadow-sm ${
+            showPoliciesGate ? "pointer-events-none opacity-40 select-none" : ""
+          }`}
+          aria-hidden={showPoliciesGate}
+        >
           <h2 className="text-lg font-bold mb-4">Dados da conta</h2>
           <div className="space-y-3 text-sm">
             <p>
@@ -220,7 +265,8 @@ export default function Profile() {
           <button
             type="button"
             onClick={() => navigate("/mfa/setup")}
-            className="mt-6 w-full bg-gray-100 text-gray-900 py-2 rounded border border-gray-200"
+            disabled={showPoliciesGate}
+            className="mt-6 w-full bg-gray-100 text-gray-900 py-2 rounded border border-gray-200 disabled:opacity-60"
           >
             Configurar 2FA
           </button>
