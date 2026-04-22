@@ -94,11 +94,16 @@ export default function ManageTasks() {
       await load();
     } catch (err) {
       const code = err?.response?.data?.error;
-      setError(
-        code === "assignee_must_be_student"
-          ? "Só pode atribuir tarefas a estudantes."
-          : "Não foi possível criar a tarefa."
-      );
+      const msg = err?.response?.data?.message;
+      if (code === "task_create_rate_limited" && typeof msg === "string") {
+        setError(msg);
+      } else {
+        setError(
+          code === "assignee_must_be_student"
+            ? "Só pode atribuir tarefas a estudantes."
+            : "Não foi possível criar a tarefa."
+        );
+      }
     } finally {
       setSaving(false);
     }

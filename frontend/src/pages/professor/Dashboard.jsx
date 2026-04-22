@@ -35,8 +35,14 @@ export default function ProfessorDashboard() {
       await createTask({ title: title.trim() });
       setTitle("");
       await load();
-    } catch {
-      setError("Falha ao criar tarefa.");
+    } catch (err) {
+      const code = err?.response?.data?.error;
+      const msg = err?.response?.data?.message;
+      if (code === "task_create_rate_limited" && typeof msg === "string") {
+        setError(msg);
+      } else {
+        setError("Falha ao criar tarefa.");
+      }
     } finally {
       setCreating(false);
     }

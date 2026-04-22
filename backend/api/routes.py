@@ -58,6 +58,7 @@ from app.data.audit_logs import create_audit_log, list_audit_logs
 from observability.logger import log_info, audit_log, log_security_event
 
 from app.db import ping_database
+from app.task_create_rate_limit import check_and_record_task_create
 
 import pyotp
 
@@ -364,12 +365,28 @@ def create_task():
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
-    audit_log("CREATE_TASK_ATTEMPT", request.user["user_id"], payload)
     try:
         assignees = _parse_assignee_user_ids(data)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
+    allowed, retry_after = check_and_record_task_create(str(request.user["user_id"]))
+    if not allowed:
+        return (
+            jsonify(
+                {
+                    "error": "task_create_rate_limited",
+                    "message": (
+                        "Limite de criação de tarefas atingido: demasiados pedidos "
+                        "em pouco tempo. Aguarde alguns segundos antes de tentar novamente."
+                    ),
+                    "retry_after": retry_after,
+                }
+            ),
+            429,
+        )
+
+    audit_log("CREATE_TASK_ATTEMPT", request.user["user_id"], payload)
     try:
         if assignees is None:
             task = create_task_db(
