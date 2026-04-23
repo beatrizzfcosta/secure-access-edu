@@ -30,7 +30,16 @@ export default function Register() {
       return;
     }
 
-    if (form.password.length < 6) {
+    const strongPassword =/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+
+    if (!strongPassword.test(form.password)) {
+      setError(
+        "A palavra-passe deve ter pelo menos 8 caracteres, incluindo maiúsculas, minúsculas, números e símbolos."
+      );
+      return;
+    }
+
+    if (form.password.length < 8) {
       setError("A palavra-passe deve ter pelo menos 6 caracteres");
       return;
     }

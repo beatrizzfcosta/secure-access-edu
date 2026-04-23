@@ -1,5 +1,5 @@
 import axios from "axios";
-import { getAccessToken } from "./authService";
+import { getAccessToken,clearAccessToken } from "./authService";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:5001",
@@ -17,11 +17,42 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const status = error.response?.status;
-    const code = error.response?.data?.error;
-    if (status === 403 && code === "PASSWORD_CHANGE_REQUIRED") {
-      window.dispatchEvent(new CustomEvent("secureacad:password-change-required"));
+    const res = error.response;
+    const status = res?.status;
+    const data = res?.data;
+
+    // 403 → password change obrigatório
+    if (status === 403 && data?.error === "PASSWORD_CHANGE_REQUIRED") {
+      window.dispatchEvent(
+        new CustomEvent("secureacad:password-change-required")
+      );
+      return Promise.reject(error);
     }
+
+    // 401 → autenticação
+    if (status === 401) {
+      const isMfa =
+        data?.mfa_required === true ||
+        data?.error?.toLowerCase?.() === "otp required";
+
+      // ✔ MFA → não interferir
+      if (isMfa) {
+        return Promise.reject(error);
+      }
+
+      // ✔ login endpoint → não interferir
+      if (error.config?.url?.includes("/login")) {
+        return Promise.reject(error);
+      }
+
+      // token inválido → logout
+      clearAccessToken();
+
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+    }
+
     return Promise.reject(error);
   }
 );
